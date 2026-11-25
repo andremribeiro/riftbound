@@ -5,7 +5,7 @@
 set -u
 here=$(cd "$(dirname "$0")" && pwd); site="$here/../docs"; tmp=$(mktemp -d); port=8766
 trap 'kill "$srv" 2>/dev/null; rm -rf "$tmp"' EXIT
-ln -s "$site/cards.json" "$tmp/cards.json"; ln -s "$site/sheets" "$tmp/sheets"
+ln -s "$site/cards.json" "$tmp/cards.json"; ln -s "$site/sheets" "$tmp/sheets"; ln -s "$site/prices.json" "$tmp/prices.json"
 cp "$here/fake-supabase.js" "$here/sync-test.js" "$tmp/"
 # Swap the CDN client for the fake (dropping its integrity line), point the page at it, append the test.
 sed -e '/supabase-js@/,/<\/script>/c\<script src="fake-supabase.js"></script>' \
