@@ -14,7 +14,7 @@ sed -e '/supabase-js@/,/<\/script>/c\<script src="fake-supabase.js"></script>' \
 python3 -m http.server "$port" --bind 127.0.0.1 --directory "$tmp" >/dev/null 2>&1 & srv=$!
 sleep 1
 shell=$(ls -d ~/.cache/ms-playwright/chromium_headless_shell-*/*/headless_shell | tail -1)
-out=$(for page in "" "?restart#deck-33333333-3333-4333-8333-333333333333"; do
+out=$(for page in "" "?nodecks" "?restart#deck-33333333-3333-4333-8333-333333333333"; do
   "$shell" --no-sandbox --virtual-time-budget=30000 --dump-dom "http://127.0.0.1:$port/$page" 2>/dev/null | sed -n '/<pre id="result">/,/<\/pre>/p' | sed 's/<[^>]*>//g'
 done)
 echo "$out"

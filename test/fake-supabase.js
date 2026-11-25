@@ -9,6 +9,7 @@ window.__db = [
 ];
 window.__decks = [];
 const restart = location.search.includes("restart");
+const noDecks = location.search.includes("nodecks");  // a project where supabase.sql's decks table was never created
 localStorage.clear();
 if (restart) {
   localStorage.setItem("rb-owner", JSON.stringify("u1"));
@@ -40,6 +41,9 @@ window.supabase = { createClient() {
       order: () => q,
       limit: (n) => { lim = n; return q; },
       then(resolve, reject) {
+        if (table === "decks" && noDecks) {
+          return wait().then(() => ({ data: null, error: { code: "PGRST205", message: "Could not find the table 'public.decks' in the schema cache" } })).then(resolve, reject);
+        }
         return wait().then(() => __fail ? { data: null, error: offline } : {
           data: rows().filter((r) => filters.every(([c, v]) => r[c] > v))
             .sort((a, b) => (a[key] < b[key] ? -1 : 1)).slice(0, lim).map((r) => structuredClone(r)),

@@ -350,6 +350,7 @@ const plainName = (c) => c.name.replace(/\s*\((Overnumbered|Alternate Art|Signat
 
 let cards = [], sets = [], byId = {}, COLS, ROWS, prices = {}, pricesDate = null, user = null, flushTimer;
 let sessionKnown = false, loadedOnce = false;  // has auth answered; has this visit loaded from Supabase
+let decksError = null;                         // why decks didn't load on the last attempt, if they didn't
 const printings = {};  // name key -> every printing, in collector order
 const firstOf = {};    // name key -> the printing decks use
 const f = { set: "all", q: "", show: "all", rarity: "", domain: "", type: "", variant: "" };
@@ -743,8 +744,9 @@ function makeChampion(c) {
 
 function renderDecks() {
   const decks = allDecks();
-  $("#new-deck").disabled = !editable();
-  $("#no-decks").hidden = decks.length > 0;
+  $("#new-deck").disabled = !editable() || !!decksError;
+  $("#no-decks").hidden = decks.length > 0 && !decksError;
+  $("#no-decks").textContent = decksError ? `Decks couldn't load (${decksError}).` : "No decks yet. Start one with New deck and pick a legend.";
   $("#deck-list").replaceChildren(...decks.map((d) => {
     const a = el("a", "deck"); a.href = `#deck-${d.id}`;
     const thumb = el("div", "thumb"); if (byId[d.legend]) sprite(thumb, byId[d.legend]);
@@ -997,15 +999,18 @@ async function load() {
     if (data.length < 1000) break;
     last = data[data.length - 1].card_id;
   }
+  // Decks are a separate table: if they can't load (say the decks part of
+  // supabase.sql was never run), the collection must still work.
   const { data: decks, error } = await sb.from("decks").select("id,name,legend,champion,cards,updated_at").limit(1000);
-  if (error) return loadFailed(error);
+  decksError = error ? (error.code ? error.message : "no connection") : null;
   saved = Object.fromEntries(rows.map((r) => [r.card_id, r.n]));
-  savedDecks = Object.fromEntries(decks.map((d) => [d.id, d]));
+  if (!error) savedDecks = Object.fromEntries(decks.map((d) => [d.id, d]));
   owner = user.id;
   loadedOnce = true;
   keep();
   renderAll();
-  status(pending.size || pendingDecks.size ? "Saving…" : IDLE);
+  if (decksError) status(`Your collection loaded, but your decks didn't (${decksError}).`, true);
+  else status(pending.size || pendingDecks.size ? "Saving…" : IDLE);
   if (pending.size || pendingDecks.size) serial(flush);
 }
 

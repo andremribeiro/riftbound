@@ -30,7 +30,16 @@ function legalDeck() {
     const queued = () => JSON.parse(localStorage.getItem("rb-pending") || "{}");
     const removeOne = () => { c.t.tile.querySelector(".art").click(); $("#card-body .stepper button").click(); $("#card").close(); };
 
-    if (location.search.includes("restart")) {
+    if (location.search.includes("nodecks")) {
+      $("#email").value = "me@example.com"; $("#password").value = "pw"; $("#login").requestSubmit();
+      await sleep(1000);
+      add.click();
+      await sleep(1000);
+      ok("a missing decks table doesn't stop the collection saving", server() === 3 && editable());
+      location.hash = "decks"; await sleep(100);
+      ok("with no decks table, New deck is off and the reason is shown", $("#new-deck").disabled && !$("#no-decks").hidden
+        && $("#no-decks").textContent.includes("public.decks"));
+    } else if (location.search.includes("restart")) {
       await sleep(1000);
       ok("a deck link opened before the decks load shows the deck", location.hash === "#deck-33333333-3333-4333-8333-333333333333"
         && !$("#view-deck").hidden && $("#deck-name").value === "Linked deck");
