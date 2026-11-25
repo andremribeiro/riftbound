@@ -69,13 +69,100 @@ def rules_text(text):
     return re.sub(r"\n{2,}", "\n", html.unescape(re.sub(r"<[^>]+>", "", rich))).strip()
 
 
+GALLERY = "https://playriftbound.com/en-us/card-gallery/"
+
+
+def parse_gallery(page, skip_sets):
+    """Cards from Riot's own card gallery page, shaped like Riftcodex records,
+    for the sets Riftcodex doesn't carry yet (Radiance, when this was written).
+
+    The gallery has no supertype, so it comes from tags: a unit named after one
+    of its own tags is a champion unit (Jinx, tagged Jinx), which also gives the
+    set of champion names; any other non-legend card tagged with a champion is
+    a Signature card (Super Mega Death Rocket!, tagged Jinx). Legend tags can't
+    serve: some are tribes (Yordle) and some champions have no legend. Tokens
+    are made by effects, never played, so they have no energy cost. Checked against Riftcodex on the sets both have: 928 cards, all
+    agree but one whose gallery tags are wrong.
+    """
+    data = json.loads(re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', page, re.S).group(1))
+
+    def find(x):  # the card list is the one whose records carry a publicCode
+        if isinstance(x, list) and x and isinstance(x[0], dict) and "publicCode" in x[0]:
+            return x
+        for v in x.values() if isinstance(x, dict) else x if isinstance(x, list) else []:
+            if (found := find(v)) is not None:
+                return found
+        return None
+
+    items = find(data)
+    assert items, "the card gallery's layout changed: no card list found"
+    num = lambda c, k: c[k]["value"]["id"] if k in c else None
+    def types_of(c):  # some new cards lack a type; their image description names it ("Riftbound Spell: ...")
+        types = [t["label"] for t in c["cardType"]["type"]]
+        m = re.match(r"Riftbound ([A-Za-z]+)\b", c["cardImage"].get("accessibilityText", ""))
+        return types or ([m.group(1)] if m else [])
+    tags_of = lambda c: c.get("tags", {}).get("tags", [])
+    token = lambda c: types_of(c)[:1] in ([], ["Unit"], ["Gear"], ["Spell"]) and "energy" not in c
+    champions = {c["name"] for c in items if types_of(c)[:1] == ["Unit"] and c["name"] in tags_of(c) and not token(c)}
+    cards, sets = [], {}
+    for c in items:
+        set_id, set_name = c["set"]["value"]["id"], c["set"]["value"]["label"]
+        if set_id in skip_sets:
+            continue
+        sets[set_id] = set_name
+        types, tags, sub = types_of(c), tags_of(c), c.get("subtitle")
+        champ = [t for t in tags if t in champions]
+        if token(c):
+            supertype = "Token"
+        elif types[0] == "Unit" and c["name"] in tags:
+            supertype = "Champion"
+        elif types[0] != "Legend" and champ:
+            supertype = "Signature"
+        else:
+            supertype = None
+        # Name champion cards "Champion, Title" whichever way round the gallery splits them.
+        if sub and c["name"] in champions:
+            name = f"{c['name']}, {sub}"
+        elif sub and sub in champions and supertype != "Signature":
+            name = f"{sub}, {c['name']}"
+        elif not sub and champ and (types[:1] == ["Legend"] or supertype == "Champion") and c["name"] not in champions:
+            name = f"{champ[0]}, {c['name']}"
+        else:
+            name = c["name"]
+        cards.append({
+            "riftbound_id": c["id"], "name": name, "collector_number": c["collectorNumber"], "tags": tags,
+            "attributes": {"energy": num(c, "energy"), "might": num(c, "might"), "power": num(c, "power")},
+            "classification": {"type": types[0] if types else "Unit", "supertype": supertype,
+                               "rarity": c["rarity"]["value"]["label"], "domain": [d["label"] for d in c["domain"]["values"]]},
+            "text": {"rich": c.get("text", {}).get("richText", {}).get("body", ""), "plain": ""},
+            "set": {"set_id": set_id, "label": set_name},
+            "media": {"image_url": c["cardImage"]["url"]},
+            "orientation": c["orientation"],
+            "metadata": {"clean_name": name, "alternate_art": False, "overnumbered": False, "signature": False},
+        })
+    return cards, sets
+
+
+def official_cards(skip_sets):
+    req = urllib.request.Request(GALLERY, headers={"User-Agent": "Mozilla/5.0 (riftbound-collection-build)"})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return parse_gallery(r.read().decode("utf-8"), skip_sets)
+
+
 def main(out):
     sets = get_json(f"{API}/sets")["items"]
+    raw = fetch_cards()
+    # Card ids stay Riftcodex's, so saved collections keep matching; Riot's
+    # gallery only fills in sets Riftcodex hasn't added yet.
+    extra, extra_sets = official_cards({s["set_id"] for s in sets})
+    raw += extra
+    # A set only in the gallery has no release date here; it sorts after the known ones.
+    sets += [{"set_id": k, "name": v, "published_on": "9999"} for k, v in extra_sets.items()]
+    print(f"from Riot's gallery: {len(extra)} cards in {', '.join(extra_sets) or 'no new sets'}")
     # Main releases first in release order, promo sets after them.
     sets.sort(key=lambda s: ("Promotional" in s["name"], s["published_on"], s["set_id"]))
     order = {s["set_id"]: i for i, s in enumerate(sets)}
 
-    raw = fetch_cards()
     # The API carries stale copies of some cards (clean_name unset, same
     # riftbound_id as the current record): drop them. Metal promos really
     # share their base card's id and art, so they get a key suffix instead.
@@ -83,7 +170,9 @@ def main(out):
     raw = [c for c in raw if c["metadata"]["clean_name"] or c["riftbound_id"] not in curated]
     for c in raw:
         c["key"] = c["riftbound_id"] + ("|metal" if c["name"].endswith("(Metal)") else "")
-    raw.sort(key=lambda c: (order.get(c["set"]["set_id"], 99), c["collector_number"], c["key"]))
+    # Numbered cards first, then the ones whose number has a prefix (runes r01, sp1, tokens t03).
+    special = lambda c: not c["riftbound_id"].split("-")[1][:1].isdigit()
+    raw.sort(key=lambda c: (order.get(c["set"]["set_id"], 99), special(c), c["collector_number"], c["key"]))
     keys = [c["key"] for c in raw]
     dupes = {k for k in keys if keys.count(k) > 1}
     assert not dupes, f"duplicate card keys, extend the dedupe rule above: {sorted(dupes)}"
