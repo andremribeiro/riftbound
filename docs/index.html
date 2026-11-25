@@ -641,6 +641,13 @@ function renderCard() {
   const price = el("div");
   if (prices[c.id] != null) price.append(el("div", "price-big", euro(prices[c.id])), el("div", "muted", `Cardmarket trend price, ${pricesDate}`));
   else price.append(el("div", "muted", "No Cardmarket price for this printing."));
+  // Cardmarket pages are addressed by name, not by the product id in its price files, so link to
+  // a search for the name as Cardmarket writes it ("Jinx, Loose Cannon"); it lists every printing.
+  const market = el("a", "btn", "Find on Cardmarket");
+  market.href = `https://www.cardmarket.com/en/Riftbound/Products/Search?searchString=${encodeURIComponent(plainName(c).replace(/ - /g, ", "))}`;
+  market.target = "_blank"; market.rel = "noopener";
+  price.append(market);
+  price.style.display = "grid"; price.style.gap = "6px"; price.style.justifyItems = "start";
   facts.append(price, stepper("Owned", qty(c), (d) => changeOwned(c, d), editable()));
 
   const d = !$("#view-deck").hidden && deckOf(ui.deck);

@@ -101,6 +101,16 @@ function legalDeck() {
       removeOne();
       await sleep(1000);
       ok("the card sheet removes a copy", server() === 6);
+      c.t.tile.querySelector(".art").click();
+      const link = document.querySelector('#card-body a[href*="cardmarket.com"]');
+      const term = (a) => new URL(a.href).searchParams.get("searchString");
+      ok("the card sheet links to a Cardmarket search for the card", term(link) === "Blazing Scorcher" && link.target === "_blank");
+      $("#card").close();
+      const legend = Object.values(firstOf).find((x) => x.type === "Legend" && x.name.includes(" - "));
+      openCard(legend);
+      ok("legend names are searched the way Cardmarket writes them",
+        term(document.querySelector('#card-body a[href*="cardmarket.com"]')) === plainName(legend).replace(/ - /g, ", ") && !term(document.querySelector('#card-body a[href*="cardmarket.com"]')).includes(" - "));
+      $("#card").close();
 
       __latency = 700;  // a slow load; the save below would finish first without serialising
       resume(); await sleep(10); add.click();
