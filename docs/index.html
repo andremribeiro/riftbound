@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#edf0f5" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0b1019" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0d0f13" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Riftbound">
 <title>Riftbound Collection</title>
@@ -12,151 +12,314 @@
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=JetBrains+Mono:wght@500;700&family=Marcellus+SC&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"
   integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"></script>
 <style>
-/* Layout: a binder. Masthead with totals, set tabs that double as progress bars,
-   a sticky search bar, then a grid of card pockets; missing cards sit ghosted. */
+/* Layout: quiet monochrome chrome so the card art carries all the colour.
+   One family (Geist), tabular figures for counts and prices, a bottom tab bar on phones. */
 :root {
-  --bg: #edf0f5; --panel: #fbfcfe; --ink: #161d2b; --muted: #586276; --line: #d3d9e3; --pocket: #dde2ea;
-  --accent: #8a6514; --on-accent: #fffdf6; --danger: #b3261e;
-  --scrim: rgb(10 14 22 / .8); --on-scrim: #fff;
+  --bg: #f4f5f7; --surface: #ffffff; --soft: #eaecf0; --line: #dfe2e8;
+  --ink: #121419; --ink-2: #5c6370; --primary: #121419; --on-primary: #ffffff;
+  --good: #1b7f45; --bad: #c0362c; --warn: #96610a;
   --d-fury: #d0432b; --d-calm: #3f9a55; --d-mind: #3576d0; --d-body: #dd8424; --d-chaos: #8a4cc2; --d-order: #cfa52b; --d-colorless: #8d96a6;
-  --display: "Marcellus SC", Georgia, serif;
-  --text: "Figtree", system-ui, sans-serif;
-  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --font: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --card-radius: 4.8% / 3.4%;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0b1019; --panel: #121927; --ink: #e6e9ef; --muted: #8f99ac; --line: #243049; --pocket: #182030;
-    --accent: #d9b25c; --on-accent: #1a1406; --danger: #f2867e; color-scheme: dark;
+    --bg: #0d0f13; --surface: #16191f; --soft: #1e222a; --line: #262b34;
+    --ink: #eef0f3; --ink-2: #9aa2b0; --primary: #eef0f3; --on-primary: #0d0f13;
+    --good: #55c588; --bad: #f2776c; --warn: #e2aa48; color-scheme: dark;
   }
 }
 [hidden] { display: none !important; }
+* { box-sizing: border-box; }
 body {
-  margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 var(--text);
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: env(safe-area-inset-top, 0px) calc(40px + env(safe-area-inset-bottom, 0px));
+  margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font); -webkit-font-smoothing: antialiased;
+  padding-block: env(safe-area-inset-top, 0px) calc(48px + env(safe-area-inset-bottom, 0px));
 }
-body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
-.wrap { max-width: 1320px; margin: 0 auto; }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* Repeated taps on one card must count, not zoom (iOS double-tap). */
-button { touch-action: manipulation; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--bg); }
+.gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1240px; margin: 0 auto; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+button { touch-action: manipulation; font: inherit; color: inherit; }
+a { color: inherit; }
+h1 { font-size: 28px; line-height: 1.15; font-weight: 650; letter-spacing: -0.02em; margin: 0; }
+h2 { font-size: 19px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+.muted { color: var(--ink-2); }
+.num { font-variant-numeric: tabular-nums; }
 
-.masthead { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 24px; padding-block: 28px 14px; }
-h1 { font: 400 clamp(28px, 4.5vw, 40px)/1.05 var(--display); letter-spacing: .03em; margin: 0; text-wrap: balance; }
-.total { display: grid; justify-items: end; gap: 2px; font-variant-numeric: tabular-nums; color: var(--muted); }
-.total strong { font: 700 22px var(--mono); color: var(--ink); }
-@media (max-width: 560px) { .total { justify-items: start; } }
-.status { font-size: 13px; color: var(--muted); min-height: 1.3em; margin: 0 0 10px; }
-.status.err { color: var(--danger); }
-.who { font-size: 13px; color: var(--muted); }
-.link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
-
-.login { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; margin-bottom: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
-.login input { flex: 1 1 180px; min-width: 0; }
-.primary { font: 600 15px var(--text); padding: 8px 16px; border: 0; border-radius: 6px; background: var(--accent); color: var(--on-accent); cursor: pointer; }
-
-.sets { display: flex; gap: 8px; overflow-x: auto; padding-block: 4px 12px; scrollbar-width: thin; }
-.set {
-  flex: 0 0 auto; display: grid; gap: 5px; min-width: 132px; padding: 9px 12px;
-  border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: inherit; font: inherit; text-align: left; cursor: pointer;
+/* Header and navigation */
+.top .wrap { display: flex; align-items: center; gap: 24px; min-height: 60px; }
+.brand { font-weight: 700; font-size: 17px; letter-spacing: -0.02em; text-decoration: none; }
+.tabs { display: flex; gap: 4px; }
+.tabs a, .tabbar a { text-decoration: none; color: var(--ink-2); font-weight: 550; padding: 7px 12px; border-radius: 999px; }
+.tabs a[aria-current], .tabbar a[aria-current] { color: var(--ink); background: var(--soft); }
+.account { margin-left: auto; display: flex; gap: 12px; align-items: center; font-size: 13px; color: var(--ink-2); min-width: 0; }
+.account span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.link { background: none; border: 0; padding: 0; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.tabbar { display: none; }
+@media (max-width: 720px) {
+  .tabs { display: none; }
+  .account span { display: none; }
+  .tabbar {
+    display: flex; gap: 6px; position: fixed; inset: auto 0 0; z-index: 25; background: var(--surface); border-top: 1px solid var(--line);
+    padding: 8px max(16px, env(safe-area-inset-left, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-right, 0px));
+  }
+  .tabbar a { flex: 1; text-align: center; padding: 10px; }
+  body { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 }
-.set[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.set b { font-weight: 600; font-size: 13px; white-space: nowrap; }
-.set small { font: 500 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
-.bar { height: 4px; border-radius: 2px; background: var(--pocket); overflow: hidden; }
-.bar i { display: block; height: 100%; width: 0; background: var(--accent); }
 
+/* Controls */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px; cursor: pointer; text-decoration: none;
+  background: var(--surface); border: 1px solid var(--line); font-weight: 550; font-size: 14px; white-space: nowrap;
+}
+.btn.primary { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+.btn.quiet { background: transparent; }
+.btn.danger { color: var(--bad); }
+.btn:disabled { opacity: .45; cursor: default; }
+.badge { min-width: 20px; padding: 0 6px; border-radius: 999px; background: var(--primary); color: var(--on-primary); font-size: 12px; line-height: 20px; text-align: center; }
+input[type="search"], input[type="email"], input[type="password"], .deck-name {
+  font: inherit; font-size: 16px; color: inherit; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 9px 16px; min-width: 0;
+}
+.chips { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-block: 2px; }
+.chips::-webkit-scrollbar { display: none; }
+.chip {
+  flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); font-size: 14px; font-weight: 500; white-space: nowrap;
+}
+.chip[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.chip small { font-size: 12px; opacity: .7; font-variant-numeric: tabular-nums; }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+
+.status { margin: 0; padding-block: 6px; font-size: 13px; color: var(--ink-2); min-height: 32px; }
+.status.err { color: var(--bad); }
+#discard { margin-bottom: 12px; }
+.login { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px; margin-bottom: 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); }
+.login p { flex-basis: 100%; margin: 0 0 4px; }
+.login input { flex: 1 1 200px; }
+
+/* Collection */
+.head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 16px; padding-block: 8px 16px; }
+.summary { margin: 6px 0 0; color: var(--ink-2); max-width: 60ch; }
+.summary strong { color: var(--ink); font-weight: 600; }
 .toolbar {
-  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
-  display: flex; flex-wrap: wrap; gap: 8px; padding-block: 10px; border-bottom: 1px solid var(--line);
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; display: flex; gap: 8px; padding-block: 10px;
+  background: var(--bg);
 }
-/* 16px: iOS zooms the page when focusing any smaller input. */
-input, select, .seg button { font: inherit; font-size: 16px; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
-#q { flex: 1 1 220px; min-width: 0; }
-.seg { display: inline-flex; }
-.seg button { cursor: pointer; border-radius: 0; margin-left: -1px; font-size: 14px; }
-.seg button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
-.seg button:last-child { border-radius: 0 6px 6px 0; }
-.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-block: 10px 18px; }
-.filters select { flex: 0 1 auto; min-width: 0; font-size: 14px; }
-.count { margin-left: auto; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.toolbar input { flex: 1; }
+.sets { padding-block: 4px 14px; }
+.sets .chip { flex-direction: column; align-items: stretch; gap: 4px; border-radius: 14px; padding: 8px 14px; text-align: left; }
+.progress { height: 3px; border-radius: 2px; background: var(--soft); overflow: hidden; }
+.chip[aria-pressed="true"] .progress { background: rgb(127 127 127 / .35); }
+.progress i { display: block; height: 100%; background: currentColor; }
+.count { margin: 0 0 12px; font-size: 13px; color: var(--ink-2); }
+.empty { padding: 48px 0; text-align: center; color: var(--ink-2); }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 16px 10px; }
-@media (min-width: 700px) { .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 22px 14px; } }
-.card { position: relative; display: grid; gap: 5px; min-width: 0; }
-.pocket {
-  position: relative; display: grid; place-items: center; width: 100%; max-width: 100%; aspect-ratio: 200 / 279;
-  border: 0; padding: 8px; border-radius: 5% / 3.6%; cursor: pointer; color: var(--muted); font: 600 12px var(--text);
-  background: var(--pocket) no-repeat; background-size: 800% 500%;
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 22px 16px; }
+@media (max-width: 560px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 8px; } }
+.tile { display: grid; gap: 6px; min-width: 0; }
+.frame { position: relative; }
+.art {
+  display: grid; place-items: center; width: 100%; max-width: 100%; aspect-ratio: 200 / 279; padding: 8px; border: 0; cursor: pointer;
+  border-radius: var(--card-radius); background: var(--soft) no-repeat; background-size: 800% 500%;
+  box-shadow: 0 1px 2px rgb(0 0 0 / .14); font-size: 12px; color: var(--ink-2);
 }
-.pocket.art { color: transparent; }
-.card:not(.own) .pocket { filter: grayscale(1); opacity: .38; }
-.card:not(.own) .pocket:hover { opacity: .65; }
-.ro .pocket { cursor: default; }
-.ro .card:not(.own) .pocket:hover { opacity: .38; }
-.n {
-  position: absolute; top: 6px; right: 6px; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 13px; box-sizing: border-box;
-  background: var(--accent); color: var(--on-accent); font: 700 13px/26px var(--mono); text-align: center; pointer-events: none;
+.tile.missing .art { filter: saturate(.15) brightness(1.04); opacity: .5; }
+@media (prefers-color-scheme: dark) { .tile.missing .art { filter: saturate(.15) brightness(.8); opacity: .55; } }
+.qty {
+  position: absolute; top: 7px; left: 7px; min-width: 24px; height: 24px; padding: 0 7px; border-radius: 999px;
+  background: var(--primary); color: var(--on-primary); font-size: 13px; font-weight: 650; line-height: 24px; text-align: center;
+  font-variant-numeric: tabular-nums; pointer-events: none;
 }
-/* Three copies is a full playset: the most a Riftbound deck may run. */
-.card.playset .n { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent); }
-.sub {
-  position: absolute; top: 4px; left: 4px; width: 34px; height: 34px; border-radius: 17px; border: 0; padding: 0;
-  background: var(--scrim); color: var(--on-scrim); font: 700 19px/34px var(--text); cursor: pointer;
+.add {
+  position: absolute; right: 6px; bottom: 6px; width: 36px; height: 36px; border-radius: 50%; border: 0; cursor: pointer;
+  background: var(--surface); color: var(--ink); font-size: 22px; line-height: 36px; box-shadow: 0 2px 8px rgb(0 0 0 / .25);
 }
-.meta { display: flex; align-items: center; gap: 6px; font: 500 11px var(--mono); color: var(--muted); min-width: 0; }
-.meta .tag { padding: 0 4px; border: 1px solid var(--line); border-radius: 3px; font-size: 10px; }
-.dots { display: inline-flex; gap: 3px; margin-left: auto; }
-.dots i { width: 8px; height: 8px; border-radius: 50%; }
-.name { font-weight: 600; font-size: 13px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card:not(.own) .name { color: var(--muted); }
-.empty { padding: 48px 0; text-align: center; color: var(--muted); }
-@media (prefers-reduced-motion: no-preference) { .pocket { transition: opacity .15s, filter .15s; } }
+.ro .add { display: none; }
+.name { font-size: 13px; font-weight: 550; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meta { display: flex; justify-content: space-between; gap: 6px; font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.tile.missing .name { color: var(--ink-2); }
+
+/* Sheets (filters, card details) */
+dialog.sheet {
+  border: 0; padding: 0; color: var(--ink); background: var(--surface); width: min(760px, 100vw - 32px);
+  max-height: min(88vh, 900px); border-radius: 20px; box-shadow: 0 24px 60px rgb(0 0 0 / .35);
+}
+dialog.sheet::backdrop { background: rgb(8 10 14 / .5); }
+@media (max-width: 720px) {
+  dialog.sheet { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 20px 20px 0 0; max-height: 92vh; }
+}
+.sheet-in { padding: 20px max(20px, env(safe-area-inset-left, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 18px; }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.close { width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--soft); cursor: pointer; font-size: 20px; line-height: 36px; }
+.groups { display: grid; gap: 18px; }
+.group { display: grid; gap: 8px; }
+.group h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.group .chips { flex-wrap: wrap; overflow: visible; }
+.sheet-foot { display: flex; justify-content: space-between; gap: 8px; }
+
+.detail { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 24px; align-items: start; }
+@media (max-width: 720px) { .detail { grid-template-columns: minmax(0, 1fr); } .detail .shot { max-width: 260px; justify-self: center; width: 100%; } }
+.shot {
+  position: relative; width: 100%; aspect-ratio: 200 / 279; border-radius: var(--card-radius); overflow: hidden;
+  background: var(--soft) no-repeat; background-size: 800% 500%;
+}
+.shot.landscape { aspect-ratio: 279 / 200; }
+.shot img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.facts { display: grid; gap: 14px; min-width: 0; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--soft); font-size: 13px; }
+.rules { margin: 0; white-space: pre-line; line-height: 1.6; }
+.sym { display: inline-block; vertical-align: -3px; margin: 0 1px; }
+.sym.energy { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--ink); color: var(--bg); font-size: 12px; font-weight: 650; line-height: 18px; text-align: center; }
+.sym.rune { width: 15px; height: 15px; border-radius: 50%; }
+.price { font-variant-numeric: tabular-nums; }
+.price-big { font-size: 22px; font-weight: 650; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.stepper { display: flex; align-items: center; gap: 12px; }
+.stepper button { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); font-size: 20px; cursor: pointer; }
+.stepper button:disabled { opacity: .4; cursor: default; }
+.stepper output { min-width: 28px; text-align: center; font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.stepper span { color: var(--ink-2); font-size: 14px; min-width: 90px; }
+
+/* Decks */
+.decks { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
+@media (max-width: 560px) { .decks { grid-template-columns: minmax(0, 1fr); } }
+.deck {
+  display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 14px; padding: 12px; border-radius: 16px; text-decoration: none;
+  background: var(--surface); border: 1px solid var(--line);
+}
+.thumb { width: 64px; aspect-ratio: 200 / 279; border-radius: var(--card-radius); background: var(--soft) no-repeat; background-size: 800% 500%; }
+.deck h2 { font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deck p { margin: 2px 0 0; font-size: 13px; color: var(--ink-2); }
+.deck p.ok, .checks .ok { color: var(--good); } .deck p.bad, .checks .bad { color: var(--bad); } .checks .warn { color: var(--warn); }
+.tally .ok { color: var(--good); }
+
+.deck-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-block: 8px 16px; }
+.deck-name { flex: 1 1 220px; font-size: 20px; font-weight: 600; border-radius: 12px; }
+.editor { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 28px; align-items: start; }
+.pane-switch { display: none; }
+@media (max-width: 960px) {
+  .editor { grid-template-columns: minmax(0, 1fr); }
+  .pane-switch { display: flex; position: sticky; top: env(safe-area-inset-top, 0px); z-index: 11; background: var(--bg); padding-block: 8px; }
+  .pool .toolbar { position: static; }
+  .editor[data-pane="pool"] .decklist, .editor[data-pane="deck"] .pool { display: none; }
+}
+.pool .chips { padding-block: 0 14px; }
+.decklist { display: grid; gap: 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 18px; min-width: 0; }
+@media (min-width: 961px) { .decklist { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; } }
+.legend-row { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; align-items: center; }
+.legend-row .thumb { width: 56px; }
+.legend-row > div { display: grid; gap: 6px; justify-items: start; }
+.tally { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tally div { background: var(--soft); border-radius: 12px; padding: 8px 10px; }
+.tally b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+.tally span { font-size: 12px; color: var(--ink-2); }
+.checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.section h3 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--ink-2); display: flex; justify-content: space-between; }
+.lines { list-style: none; margin: 0; padding: 0; }
+.line { display: grid; grid-template-columns: 28px 22px minmax(0, 1fr) auto 28px; gap: 8px; align-items: center; padding-block: 4px; font-size: 14px; }
+.line .n { font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
+.line .nm { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.line .need { font-size: 12px; color: var(--warn); white-space: nowrap; }
+.line .step { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); cursor: pointer; line-height: 1; padding: 0; }
+.ro .line .step { visibility: hidden; }
 </style>
 </head>
 <body class="ro">
-<div class="wrap">
-  <header class="masthead">
-    <div>
-      <h1>Riftbound Collection</h1>
-      <div class="who" id="who" hidden><span id="who-email"></span> · <button type="button" class="link" id="signout">Sign out</button></div>
-    </div>
-    <div class="total">
-      <div><strong id="owned">0</strong> of <span id="all">0</span> cards</div>
-      <div id="copies">0 copies</div>
-    </div>
-  </header>
+<header class="top gutter">
+  <div class="wrap">
+    <a class="brand" href="#collection">Riftbound</a>
+    <nav class="tabs" aria-label="Sections">
+      <a href="#collection" data-tab="collection">Collection</a>
+      <a href="#decks" data-tab="decks">Decks</a>
+    </nav>
+    <div class="account" id="who" hidden><span id="who-email"></span><button type="button" class="link" id="signout">Sign out</button></div>
+  </div>
+</header>
+
+<main class="wrap gutter">
   <p class="status" id="status" role="status">Loading the card list…</p>
+  <button type="button" class="btn danger" id="discard" hidden>Discard unsaved changes</button>
   <form class="login" id="login" hidden>
+    <p>Sign in to track your cards and build decks.</p>
     <input type="email" id="email" autocomplete="username" placeholder="Email" aria-label="Email" required>
     <input type="password" id="password" autocomplete="current-password" placeholder="Password" aria-label="Password" required>
-    <button type="submit" class="primary">Sign in</button>
+    <button type="submit" class="btn primary">Sign in</button>
   </form>
-  <nav class="sets" id="sets" aria-label="Sets"></nav>
-  <div class="toolbar">
-    <input type="search" id="q" placeholder="Search name or number, e.g. Jinx or OGN 251" aria-label="Search cards">
-    <div class="seg" id="show" role="group" aria-label="Show">
-      <button type="button" data-v="all" aria-pressed="true">All</button>
-      <button type="button" data-v="owned" aria-pressed="false">Owned</button>
-      <button type="button" data-v="missing" aria-pressed="false">Missing</button>
+
+  <section id="view-collection">
+    <div class="head">
+      <div>
+        <h1>Collection</h1>
+        <p class="summary" id="summary"></p>
+      </div>
+    </div>
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="Search by name or number" aria-label="Search cards">
+      <button type="button" class="btn" id="open-filters">Filters <span class="badge" id="filter-count" hidden></span></button>
+    </div>
+    <div class="chips sets" id="sets" aria-label="Sets"></div>
+    <p class="count" id="count"></p>
+    <div class="grid" id="grid"></div>
+    <p class="empty" id="empty" hidden>No cards match these filters.</p>
+  </section>
+
+  <section id="view-decks" hidden>
+    <div class="head">
+      <h1>Decks</h1>
+      <button type="button" class="btn primary" id="new-deck">New deck</button>
+    </div>
+    <div class="decks" id="deck-list"></div>
+    <p class="empty" id="no-decks" hidden>No decks yet. Start one with New deck and pick a legend.</p>
+  </section>
+
+  <section id="view-deck" hidden>
+    <div class="deck-head">
+      <a class="btn quiet" href="#decks">Back to decks</a>
+      <input class="deck-name" id="deck-name" aria-label="Deck name" maxlength="80">
+      <button type="button" class="btn danger" id="delete-deck">Delete deck</button>
+    </div>
+    <div id="legend-pick" hidden>
+      <h2>Choose a legend</h2>
+      <p class="muted">Your legend sets the two domains the rest of the deck can use.</p>
+      <div class="toolbar"><input type="search" id="legend-q" placeholder="Search legends" aria-label="Search legends"></div>
+      <div class="grid" id="legend-grid"></div>
+    </div>
+    <div class="editor" id="editor" data-pane="deck" hidden>
+      <div class="pane-switch chips">
+        <button type="button" class="chip" data-pane="deck" aria-pressed="true">Deck</button>
+        <button type="button" class="chip" data-pane="pool" aria-pressed="false">Add cards</button>
+      </div>
+      <div class="pool">
+        <div class="toolbar"><input type="search" id="pool-q" placeholder="Search cards for this deck" aria-label="Search cards for this deck"></div>
+        <div class="chips" id="pool-types"></div>
+        <div class="grid" id="pool-grid"></div>
+      </div>
+      <aside class="decklist" id="decklist" aria-label="Deck list"></aside>
+    </div>
+  </section>
+</main>
+
+<nav class="tabbar" aria-label="Sections">
+  <a href="#collection" data-tab="collection">Collection</a>
+  <a href="#decks" data-tab="decks">Decks</a>
+</nav>
+
+<dialog class="sheet" id="filters" aria-label="Filters">
+  <div class="sheet-in">
+    <div class="sheet-head"><h2>Filters</h2><button type="button" class="close" data-close aria-label="Close">×</button></div>
+    <div class="groups" id="filter-groups"></div>
+    <div class="sheet-foot">
+      <button type="button" class="btn quiet" id="clear-filters">Clear filters</button>
+      <button type="button" class="btn primary" data-close>Show cards</button>
     </div>
   </div>
-  <div class="filters">
-    <select id="rarity" aria-label="Rarity"></select>
-    <select id="domain" aria-label="Domain"></select>
-    <select id="type" aria-label="Card type"></select>
-    <select id="variant" aria-label="Version"></select>
-    <span class="count" id="count"></span>
-  </div>
-  <main class="grid" id="grid"></main>
-  <p class="empty" id="empty" hidden>No cards match these filters.</p>
-</div>
+</dialog>
+<dialog class="sheet" id="card" aria-label="Card details"><div class="sheet-in" id="card-body"></div></dialog>
 
 <script>
 // Supabase project settings. The publishable (anon) key is meant to ship in
@@ -165,16 +328,36 @@ const SUPABASE_URL = "https://zubiqtaihhrsywvwgnny.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BVxAeMbfljbcw1oUDV6umg_YwwzskoS";
 
 const $ = (s) => document.querySelector(s);
-const RARITY = { Common: "C", Uncommon: "U", Rare: "R", Epic: "E", Showcase: "S", Promo: "P" };
+const RARITIES = ["Common", "Uncommon", "Rare", "Epic", "Showcase", "Promo"];
 const DOMAINS = ["Fury", "Calm", "Mind", "Body", "Chaos", "Order", "Colorless"];
-const TAG = { "Alt art": "ALT", Overnumbered: "OVN", Signature: "SIG", Metal: "MTL" };
+const TYPES = ["Unit", "Spell", "Gear", "Legend", "Battlefield", "Rune"];
+const VARIANTS = ["Alt art", "Overnumbered", "Signature", "Metal"];
+const MAIN_TYPES = new Set(["Unit", "Spell", "Gear"]);
+const DECK_SECTIONS = [["Unit", "Units"], ["Spell", "Spells"], ["Gear", "Gear"], ["Rune", "Runes"], ["Battlefield", "Battlefields"]];
 const MAX_COPIES = 999;  // matches the check in supabase.sql
-const f = { set: "all", q: "", show: "all", rarity: "", domain: "", type: "", variant: "*" };
-let cards = [], sets = [], COLS, ROWS, user = null, flushTimer;
+// Standard ban list from the official rules hub, updated 23 Nov 2026. It changes; edit it here.
+const BANNED = new Set(["Called Shot", "Ekko, Recurrent", "Draven, Vanquisher", "Fight or Flight", "Scrapheap", "Stealthy Pursuer",
+  "Stacked Deck", "Riven, Broken Blade", "Zhonya's Hourglass", "Stellacorn Herder", "Nocturne, Horrifying", "Rhasa the Sunderer",
+  "Brynhir Thundersong", "Dazzling Aurora", "Baited Hook", "The Arena's Greatest", "Aspirant's Climb", "Dreaming Tree",
+  "Obelisk of Power", "Reaver's Row", "Star Spring", "Emperor's Dais"].map((n) => nameKey(n)));
 
-// The device keeps the last saved counts (instant start, offline browsing) and
+// Cards with the same name are the same card for deck rules (Core Rules 103.2.b),
+// whatever the printing: alt art, overnumbered, signature or metal.
+function nameKey(name) {
+  return name.toLowerCase().replace(/\s*\((overnumbered|alternate art|signature|metal)\)\s*$/, "").replace(/ - /g, ", ").replace(/\s+/g, " ").trim();
+}
+const plainName = (c) => c.name.replace(/\s*\((Overnumbered|Alternate Art|Signature|Metal)\)\s*$/, "");
+
+let cards = [], sets = [], byId = {}, COLS, ROWS, prices = {}, pricesDate = null, user = null, flushTimer;
+let sessionKnown = false, loadedOnce = false;  // has auth answered; has this visit loaded from Supabase
+const printings = {};  // name key -> every printing, in collector order
+const firstOf = {};    // name key -> the printing decks use
+const f = { set: "all", q: "", show: "all", rarity: "", domain: "", type: "", variant: "" };
+const ui = { deck: null, poolType: "", poolQ: "", legendQ: "" };
+
+// The device keeps the last saved state (instant start, offline browsing) and
 // the changes not yet saved, so taps made without signal survive closing the app.
-// Counts are absolute and the last save wins: right for one person's collection,
+// Saves are absolute and the last one wins: right for one person's collection,
 // but if two devices are edited offline at the same time, the later save stands.
 const local = {
   get(k, fallback) {
@@ -186,30 +369,39 @@ const local = {
     catch (e) { console.warn(`Couldn't keep ${k} on this device:`, e); return false; }
   },
 };
-let saved = local.get("rb-saved", {});                                 // card id -> copies, as last read from Supabase
-const pending = new Map(Object.entries(local.get("rb-pending", {})));  // card id -> copies, not yet saved
+let saved = local.get("rb-saved", {});                                          // card id -> copies, as last read
+let savedDecks = local.get("rb-decks", {});                                     // deck id -> deck, as last read
+const pending = new Map(Object.entries(local.get("rb-pending", {})));           // card id -> copies, not yet saved
+const pendingDecks = new Map(Object.entries(local.get("rb-pending-decks", {}))); // deck id -> deck, or null to delete
 let owner = local.get("rb-owner", null);  // account the device copy belongs to; set once it has loaded
 
 function keep() {
-  const ok = [local.set("rb-saved", saved), local.set("rb-pending", Object.fromEntries(pending)), local.set("rb-owner", owner)].every(Boolean);
+  const ok = [local.set("rb-saved", saved), local.set("rb-decks", savedDecks), local.set("rb-pending", Object.fromEntries(pending)),
+    local.set("rb-pending-decks", Object.fromEntries(pendingDecks)), local.set("rb-owner", owner)].every(Boolean);
   if (!ok) status("This device can't store your changes (storage full or private browsing). Stay online until they're saved.", true);
   return ok;
 }
 
 const sb = SUPABASE_URL && window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
-// Taps need counts this account has loaded at least once on this device;
+// Changes need data this account has loaded at least once on this device;
 // counting up from an empty copy would overwrite the real numbers.
 const editable = () => !!user && owner === user.id;
 const qty = (c) => (pending.has(c.id) ? pending.get(c.id) : saved[c.id] || 0);
-const status = (msg, err = false) => { const el = $("#status"); el.textContent = msg; el.classList.toggle("err", err); };
+const ownedByName = (k) => printings[k].reduce((s, c) => s + qty(c), 0);
+const status = (msg, err = false) => { const e = $("#status"); e.textContent = msg; e.classList.toggle("err", err); };
 const fmt = (x) => x.toLocaleString();
+const money = new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR" });
+const euro = (x) => (x == null ? "" : money.format(x));
+const hasWords = (hay, q) => q.split(/\s+/).every((w) => hay.includes(w));  // every typed word, in any order
 const shortSet = (s) => s.name.replace(/^Riftbound /, "").replace("Promotional Cards", "Promos");
-const IDLE = "Tap a card to add a copy; − removes one.";
+const cheapest = (k) => { const ps = printings[k].map((c) => prices[c.id]).filter((p) => p != null); return ps.length ? Math.min(...ps) : null; };
+const IDLE = "All changes saved.";
 
 // Saves and loads run one at a time in the order asked, so a load can never
 // land between a save and the tap after it, and two loads never race.
 let chain = Promise.resolve();
 const serial = (fn) => (chain = chain.then(fn).catch((e) => status(`Something went wrong: ${e.message}`, true)));
+const schedule = () => { clearTimeout(flushTimer); flushTimer = setTimeout(() => serial(flush), 600); };
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -217,71 +409,118 @@ function el(tag, cls, text) {
   if (text != null) e.textContent = text;
   return e;
 }
+function domainTag(d) {
+  const t = el("span", "tag", d), dot = el("span", "dot");
+  dot.style.background = `var(--d-${d.toLowerCase()})`;
+  t.prepend(dot);
+  return t;
+}
 
-function options(sel, any, values, labels = {}) {
-  sel.replaceChildren(new Option(any, sel.id === "variant" ? "*" : ""), ...values.map((v) => new Option(labels[v] || v, v)));
+// Card text marks costs and stats with icon codes (:rb_energy_2:, :rb_rune_fury:, ...); draw them as symbols.
+function rulesText(text) {
+  const p = el("p", "rules");
+  for (const part of text.split(/(:rb_[a-z0-9_]+:)/)) {
+    const m = part.match(/^:rb_(?:energy_(\d+)|rune_([a-z]+)|(might|exhaust)):$/);
+    if (!m) { if (part) p.append(part); continue; }
+    if (m[3]) { p.append(m[3] === "might" ? "Might" : "Exhaust"); continue; }
+    const s = el("span", m[1] != null ? "sym energy" : "sym rune", m[1] ?? "");
+    const label = m[1] != null ? `${m[1]} energy` : m[2] === "rainbow" ? "a rune of any domain" : `a ${m[2]} rune`;
+    if (m[2]) s.style.background = m[2] === "rainbow" ? "conic-gradient(var(--d-fury), var(--d-body), var(--d-order), var(--d-calm), var(--d-mind), var(--d-chaos), var(--d-fury))" : `var(--d-${m[2]}, var(--d-colorless))`;
+    s.setAttribute("role", "img"); s.setAttribute("aria-label", label); s.title = label;
+    p.append(s);
+  }
+  return p;
 }
 
 // Art is packed 40 to a sheet (see build.py); a card's sheet and slot follow from its index.
+function sprite(node, c) {
+  const per = COLS * ROWS, p = c.i % per;
+  node.style.backgroundImage = `url(sheets/${Math.floor(c.i / per)}.webp)`;
+  node.style.backgroundPosition = `${(p % COLS) / (COLS - 1) * 100}% ${Math.floor(p / COLS) / (ROWS - 1) * 100}%`;
+}
 const artIO = new IntersectionObserver((entries) => {
   for (const e of entries) {
     if (!e.isIntersecting) continue;
-    const i = +e.target.dataset.i, per = COLS * ROWS, p = i % per;
-    e.target.style.backgroundImage = `url(sheets/${Math.floor(i / per)}.webp)`;
-    e.target.style.backgroundPosition = `${(p % COLS) / (COLS - 1) * 100}% ${Math.floor(p / COLS) / (ROWS - 1) * 100}%`;
+    sprite(e.target, byId[e.target.dataset.id]);
     artIO.unobserve(e.target);
   }
 }, { rootMargin: "800px 0px" });
 
-function buildGrid() {
-  const setName = Object.fromEntries(sets.map((s) => [s.id, shortSet(s)]));
+function makeTile(c, label) {
+  const tile = el("div", "tile");
+  const frame = el("div", "frame");
+  const art = el("button", "art", c.art ? "" : c.name);
+  art.type = "button"; art.dataset.id = c.id; art.setAttribute("aria-label", label || `${c.name}, details`);
+  if (c.art) artIO.observe(art);
+  const qtyEl = el("span", "qty"); qtyEl.hidden = true;
+  const add = el("button", "add", "+");
+  add.type = "button"; add.dataset.id = c.id;
+  frame.append(art, qtyEl, add);
+  const meta = el("div", "meta");
+  meta.append(el("span", "", `${c.set} ${c.no}`), el("span", "price", euro(prices[c.id])));
+  tile.append(frame, el("div", "name", c.name), meta);
+  return { tile, qty: qtyEl, add };
+}
+
+/* ---------- Collection ---------- */
+
+function buildCollection() {
   const frag = document.createDocumentFragment();
-  cards.forEach((c, i) => {
-    const card = el("div", "card");
-    const pocket = el("button", "pocket" + (c.art ? " art" : ""), c.name);
-    pocket.type = "button";
-    pocket.dataset.i = i;
-    pocket.title = `${c.name} · ${setName[c.set]} ${c.no}${c.variant ? " · " + c.variant : ""} · ${c.rarity}`;
-    const n = el("span", "n"); n.hidden = true;
-    const sub = el("button", "sub", "−"); sub.type = "button"; sub.hidden = true;
-    sub.setAttribute("aria-label", `Remove one ${c.name}`);
-    const meta = el("div", "meta", `${c.set} ${c.no}`);
-    meta.append(el("span", "", RARITY[c.rarity] || c.rarity[0]));
-    if (c.variant) { const t = el("span", "tag", TAG[c.variant] || c.variant); t.title = c.variant; meta.append(t); }
-    const dots = el("span", "dots");
-    for (const d of c.domain) { const dot = el("i"); dot.style.background = `var(--d-${d.toLowerCase()}, var(--d-colorless))`; dot.title = d; dots.append(dot); }
-    meta.append(dots);
-    card.append(pocket, n, sub, meta, el("div", "name", c.name));
-    Object.assign(c, { el: card, n, sub });
-    if (c.art) artIO.observe(pocket);
-    frag.append(card);
-  });
-  $("#grid").append(frag);
-}
-
-function paint(c) {
-  const k = qty(c);
-  c.el.classList.toggle("own", k > 0);
-  c.el.classList.toggle("playset", k >= 3);
-  c.n.hidden = k === 0;
-  c.n.textContent = k;
-  c.sub.hidden = k === 0 || !editable();
-}
-
-function renderAll() {
-  document.body.classList.toggle("ro", !editable());
-  cards.forEach(paint);
-  const own = cards.filter((c) => qty(c) > 0);
-  $("#owned").textContent = fmt(own.length);
-  $("#all").textContent = fmt(cards.length);
-  $("#copies").textContent = `${fmt(own.reduce((s, c) => s + qty(c), 0))} copies`;
-  for (const btn of $("#sets").children) {
-    const pool = btn.dataset.set === "all" ? cards : cards.filter((c) => c.set === btn.dataset.set);
-    const have = pool.filter((c) => qty(c) > 0).length;
-    btn.querySelector("small").textContent = `${fmt(have)} / ${fmt(pool.length)}`;
-    btn.querySelector(".bar i").style.width = `${(have / pool.length) * 100}%`;
+  for (const c of cards) {
+    c.t = makeTile(c);
+    c.t.add.setAttribute("aria-label", `Add a copy of ${c.name}`);
+    frag.append(c.t.tile);
   }
-  renderCount();
+  $("#grid").append(frag);
+  $("#grid").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    const c = byId[b.dataset.id];
+    if (b.classList.contains("add")) { if (editable()) changeOwned(c, 1); }
+    else openCard(c);
+  });
+
+  const setChip = (id, label) => {
+    const b = el("button", "chip");
+    b.type = "button"; b.dataset.set = id; b.setAttribute("aria-pressed", id === f.set);
+    const bar = el("span", "progress"); bar.append(el("i"));
+    b.append(el("span", "", label), el("small"), bar);
+    return b;
+  };
+  $("#sets").replaceChildren(setChip("all", "All sets"), ...sets.map((s) => setChip(s.id, shortSet(s))));
+  $("#sets").addEventListener("click", (e) => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    f.set = b.dataset.set;
+    for (const x of $("#sets").children) x.setAttribute("aria-pressed", x === b);
+    applyFilters();
+  });
+  $("#q").addEventListener("input", (e) => { f.q = e.target.value.trim().toLowerCase(); applyFilters(); });
+
+  const groups = [
+    ["show", "Show", [["all", "All cards"], ["owned", "Owned"], ["missing", "Missing"]]],
+    ["rarity", "Rarity", [["", "Any"], ...RARITIES.map((r) => [r, r])]],
+    ["domain", "Domain", [["", "Any"], ...DOMAINS.map((d) => [d, d])]],
+    ["type", "Card type", [["", "Any"], ...TYPES.map((t) => [t, t])]],
+    ["variant", "Printing", [["", "Any"], ["standard", "Standard"], ...VARIANTS.map((v) => [v, v])]],
+  ];
+  $("#filter-groups").replaceChildren(...groups.map(([key, title, opts]) => {
+    const g = el("div", "group");
+    const row = el("div", "chips");
+    for (const [v, label] of opts) {
+      const b = el("button", "chip", label);
+      b.type = "button"; b.dataset.key = key; b.dataset.value = v;
+      if (key === "domain" && v) { const d = el("span", "dot"); d.style.background = `var(--d-${v.toLowerCase()})`; b.prepend(d); }
+      row.append(b);
+    }
+    g.append(el("h3", "", title), row);
+    return g;
+  }));
+  $("#filter-groups").addEventListener("click", (e) => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    f[b.dataset.key] = b.dataset.value;
+    applyFilters();
+  });
+  $("#open-filters").addEventListener("click", () => $("#filters").showModal());
+  $("#clear-filters").addEventListener("click", () => { Object.assign(f, { show: "all", rarity: "", domain: "", type: "", variant: "" }); applyFilters(); });
 }
 
 function matches(c) {
@@ -291,86 +530,439 @@ function matches(c) {
   if (f.rarity && c.rarity !== f.rarity) return false;
   if (f.domain && !c.domain.includes(f.domain)) return false;
   if (f.type && c.type !== f.type) return false;
-  if (f.variant !== "*" && c.variant !== f.variant) return false;
-  if (f.q) {
-    const hay = `${c.name} ${c.set} ${c.no} ${c.set}${c.no}`.toLowerCase();
-    if (!f.q.split(/\s+/).every((w) => hay.includes(w))) return false;
-  }
-  return true;
+  if (f.variant && (f.variant === "standard" ? c.variant !== "" : c.variant !== f.variant)) return false;
+  return !f.q || hasWords(`${c.name} ${c.set} ${c.no} ${c.set}${c.no}`.toLowerCase(), f.q);
 }
 
 // Filters apply on filter changes only, so a card you just marked stays put
 // under "Missing" until you change the view; a mis-tap is easy to undo.
 function applyFilters() {
-  for (const c of cards) c.el.hidden = !matches(c);
+  for (const c of cards) c.t.tile.hidden = !matches(c);
+  for (const b of $("#filter-groups").querySelectorAll(".chip")) b.setAttribute("aria-pressed", f[b.dataset.key] === b.dataset.value);
+  const active = ["rarity", "domain", "type", "variant"].filter((k) => f[k]).length + (f.show !== "all");
+  $("#filter-count").hidden = !active;
+  $("#filter-count").textContent = active;
   renderCount();
 }
 
 function renderCount() {
-  const shown = cards.filter((c) => !c.el.hidden);
-  $("#count").textContent = `${fmt(shown.length)} shown · ${fmt(shown.filter((c) => qty(c) > 0).length)} owned`;
+  const shown = cards.filter((c) => !c.t.tile.hidden);
+  const own = shown.filter((c) => qty(c) > 0).length;
+  $("#count").textContent = `${fmt(shown.length)} cards shown, ${fmt(own)} owned`;
   $("#empty").hidden = shown.length > 0;
 }
 
-function buildFilters() {
-  const setBtn = (id, label) => {
-    const b = el("button", "set");
-    b.type = "button"; b.dataset.set = id; b.setAttribute("aria-pressed", id === f.set);
-    const bar = el("span", "bar"); bar.append(el("i"));
-    b.append(el("b", "", label), el("small"), bar);
-    return b;
-  };
-  $("#sets").replaceChildren(setBtn("all", "All sets"), ...sets.map((s) => setBtn(s.id, shortSet(s))));
-  const present = (k) => [...new Set(cards.map((c) => c[k]))];
-  options($("#rarity"), "Any rarity", Object.keys(RARITY).filter((r) => present("rarity").includes(r)));
-  options($("#domain"), "Any domain", DOMAINS);
-  options($("#type"), "Any type", present("type").sort());
-  options($("#variant"), "Any version", ["", ...Object.keys(TAG)], { "": "Standard" });
-
-  $("#sets").addEventListener("click", (e) => {
-    const b = e.target.closest(".set"); if (!b) return;
-    f.set = b.dataset.set;
-    for (const x of $("#sets").children) x.setAttribute("aria-pressed", x === b);
-    applyFilters();
-  });
-  $("#show").addEventListener("click", (e) => {
-    const b = e.target.closest("button"); if (!b) return;
-    f.show = b.dataset.v;
-    for (const x of $("#show").children) x.setAttribute("aria-pressed", x === b);
-    applyFilters();
-  });
-  $("#q").addEventListener("input", (e) => { f.q = e.target.value.trim().toLowerCase(); applyFilters(); });
-  for (const id of ["rarity", "domain", "type", "variant"]) {
-    $("#" + id).addEventListener("change", (e) => { f[id] = e.target.value; applyFilters(); });
+function renderCollection() {
+  document.body.classList.toggle("ro", !editable());
+  let owned = 0, copies = 0, worth = 0;
+  for (const c of cards) {
+    const k = qty(c);
+    c.t.tile.classList.toggle("missing", !k);
+    c.t.qty.hidden = !k;
+    c.t.qty.textContent = k;
+    if (k) { owned++; copies += k; worth += k * (prices[c.id] || 0); }
   }
-  $("#grid").addEventListener("click", (e) => {
-    const b = e.target.closest("button"); if (!b || !editable()) return;
-    const c = cards[+b.closest(".card").querySelector(".pocket").dataset.i];
-    change(c, b.classList.contains("sub") ? -1 : 1);
-  });
+  const s = $("#summary");
+  s.replaceChildren("You own ", el("strong", "num", fmt(owned)), ` of ${fmt(cards.length)} cards (${fmt(copies)} copies)`);
+  if (pricesDate) s.append(", worth about ", el("strong", "num", euro(worth)), ` at Cardmarket trend prices from ${pricesDate}.`);
+  else s.append(".");
+  for (const b of $("#sets").children) {
+    const pool = b.dataset.set === "all" ? cards : cards.filter((c) => c.set === b.dataset.set);
+    const have = pool.filter((c) => qty(c) > 0).length;
+    b.querySelector("small").textContent = `${fmt(have)} / ${fmt(pool.length)}`;
+    b.querySelector(".progress i").style.width = `${(have / pool.length) * 100}%`;
+  }
+  renderCount();
 }
 
-function change(c, delta) {
+function changeOwned(c, delta) {
   pending.set(c.id, Math.min(MAX_COPIES, Math.max(0, qty(c) + delta)));
   if (keep()) status("Saving…");
+  schedule();
   renderAll();
-  clearTimeout(flushTimer);
-  flushTimer = setTimeout(() => serial(flush), 600);  // rapid taps coalesce into one save
 }
 
+/* ---------- Card details ---------- */
+
+let sheetCard = null;
+function openCard(c) {
+  sheetCard = c;
+  renderCard();
+  if (!$("#card").open) $("#card").showModal();
+}
+
+function stepper(label, value, onStep, enabled) {
+  const row = el("div", "stepper");
+  const minus = el("button", "", "−"), plus = el("button", "", "+");
+  minus.type = plus.type = "button";
+  minus.setAttribute("aria-label", `Remove one, ${label}`); plus.setAttribute("aria-label", `Add one, ${label}`);
+  minus.disabled = !enabled || value <= 0; plus.disabled = !enabled;
+  minus.onclick = () => onStep(-1); plus.onclick = () => onStep(1);
+  row.append(el("span", "", label), minus, el("output", "", value), plus);
+  return row;
+}
+
+function renderCard() {
+  const c = sheetCard; if (!c) return;
+  // The sheet is rebuilt on every change; put keyboard focus back on the same control.
+  const focused = $("#card-body").contains(document.activeElement) ? document.activeElement.getAttribute("aria-label") : null;
+  const head = el("div", "sheet-head");
+  const close = el("button", "close", "×"); close.type = "button"; close.dataset.close = ""; close.setAttribute("aria-label", "Close");
+  head.append(el("h2", "", plainName(c)), close);
+
+  const shot = el("div", "shot" + (c.landscape ? " landscape" : ""));
+  if (c.art && !c.landscape) sprite(shot, c);  // the sharp image loads over it; landscape art is rotated in the sprite
+  if (c.image) {
+    // Riot's CDN refuses requests that name another site as the referrer, so send none.
+    const img = el("img"); img.alt = plainName(c); img.referrerPolicy = "no-referrer"; img.decoding = "async";
+    img.src = `${c.image}${c.image.includes("?") ? "&" : "?"}w=600&fm=webp&q=85`;
+    img.onerror = () => img.remove();
+    shot.append(img);
+  }
+
+  const facts = el("div", "facts");
+  const tags = el("div", "tags");
+  tags.append(el("span", "tag", `${shortSet(sets.find((s) => s.id === c.set))} ${c.no}`), el("span", "tag", c.rarity),
+    el("span", "tag", c.super ? `${c.super} ${c.type.toLowerCase()}` : c.type));
+  if (c.variant) tags.append(el("span", "tag", c.variant));
+  for (const d of c.domain) tags.append(domainTag(d));
+  facts.append(tags);
+  const stats = [["Cost", c.cost], ["Might", c.might], ["Power", c.power]].filter(([, v]) => v != null);
+  if (stats.length) facts.append(el("p", "muted", stats.map(([k, v]) => `${k} ${v}`).join(", ")));
+  if (c.text) facts.append(rulesText(c.text));
+  const price = el("div");
+  if (prices[c.id] != null) price.append(el("div", "price-big", euro(prices[c.id])), el("div", "muted", `Cardmarket trend price, ${pricesDate}`));
+  else price.append(el("div", "muted", "No Cardmarket price for this printing."));
+  facts.append(price, stepper("Owned", qty(c), (d) => changeOwned(c, d), editable()));
+
+  const d = !$("#view-deck").hidden && deckOf(ui.deck);
+  if (d && byId[d.legend] && c.type !== "Legend") {
+    const k = nameKey(c.name), L = byId[d.legend], deckCard = firstOf[k];
+    if (allowedIn(deckCard, L)) {
+      facts.append(stepper("In this deck", deckCount(d, k), (s) => changeDeck(deckCard, s), editable()));
+      if (isChampionFor(deckCard, L) && d.champion !== deckCard.id) {
+        const b = el("button", "btn", "Make Chosen Champion"); b.type = "button"; b.disabled = !editable();
+        b.onclick = () => makeChampion(deckCard);
+        facts.append(b);
+      }
+    } else facts.append(el("p", "muted", `Can't go in a ${plainName(L)} deck.`));
+  }
+  const body = el("div", "detail"); body.append(shot, facts);
+  $("#card-body").replaceChildren(head, body);
+  if (focused) [...$("#card-body").querySelectorAll("[aria-label]")].find((x) => x.getAttribute("aria-label") === focused && !x.disabled)?.focus();
+}
+
+for (const dlg of document.querySelectorAll("dialog.sheet")) {
+  dlg.addEventListener("click", (e) => { if (e.target === dlg || e.target.closest("[data-close]")) dlg.close(); });
+}
+$("#card").addEventListener("close", () => { sheetCard = null; });
+
+/* ---------- Decks ---------- */
+
+const deckOf = (id) => (pendingDecks.has(id) ? pendingDecks.get(id) : Object.hasOwn(savedDecks, id) ? savedDecks[id] : null) || null;
+const allDecks = () => [...new Set([...Object.keys(savedDecks), ...pendingDecks.keys()])].map(deckOf).filter(Boolean)
+  .sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
+const isChampionFor = (c, L) => c.type === "Unit" && c.super === "Champion" && c.tags.some((t) => L.tags.includes(t));
+const fitsDomains = (c, L) => c.domain.every((d) => d === "Colorless" || L.domain.includes(d));
+const allowedIn = (c, L) => c.type !== "Legend" && c.super !== "Token" && fitsDomains(c, L)
+  && (c.super !== "Signature" || c.tags.some((t) => L.tags.includes(t)));
+
+function deckEntries(d) {  // [card, copies] for everything in the deck except the legend
+  const out = Object.entries(d.cards || {}).map(([id, n]) => [byId[id], n]).filter(([c, n]) => c && n > 0);
+  if (byId[d.champion]) out.push([byId[d.champion], 1]);
+  return out;
+}
+const deckCount = (d, k) => deckEntries(d).reduce((s, [c, n]) => s + (nameKey(c.name) === k ? n : 0), 0);
+
+// Deck construction rules, Core Rules 103 (Oct 2026).
+function checkDeck(d) {
+  const L = byId[d.legend], all = deckEntries(d), champ = byId[d.champion];
+  const count = (pred) => all.reduce((s, [c, n]) => s + (pred(c) ? n : 0), 0);
+  const main = count((c) => MAIN_TYPES.has(c.type)), runes = count((c) => c.type === "Rune"), fields = count((c) => c.type === "Battlefield");
+  const issues = [], warnings = [];
+  if (!L) return { main, runes, fields, issues: ["Choose a legend."], warnings, legal: false };
+  if (main < 40) issues.push(`The main deck has ${main} cards; it needs at least 40.`);
+  if (!champ) issues.push(`Pick a Chosen Champion: a champion unit tagged ${L.tags.join(" or ")}.`);
+  else if (!isChampionFor(champ, L)) issues.push(`${plainName(champ)} can't be the Chosen Champion for ${plainName(L)}.`);
+  const copies = new Map();
+  for (const [c, n] of all) if (MAIN_TYPES.has(c.type)) copies.set(nameKey(c.name), (copies.get(nameKey(c.name)) || 0) + n);
+  for (const [k, n] of copies) if (n > 3) issues.push(`${plainName(firstOf[k])}: ${n} copies; the limit is 3.`);
+  for (const [c] of all) if (!fitsDomains(c, L)) issues.push(`${plainName(c)} is outside ${L.domain.join(" and ")}.`);
+  const signature = all.filter(([c]) => c.super === "Signature");
+  const sigCount = signature.reduce((s, [, n]) => s + n, 0);
+  if (sigCount > 3) issues.push(`${sigCount} Signature cards; the limit is 3.`);
+  for (const [c] of signature) if (!c.tags.some((t) => L.tags.includes(t))) issues.push(`${plainName(c)} is a Signature card for another champion.`);
+  if (runes !== 12) issues.push(`${runes} runes; a deck needs exactly 12.`);
+  if (fields !== 3) issues.push(`${fields} battlefields; a deck needs 3.`);
+  const fieldNames = all.filter(([c]) => c.type === "Battlefield").map(([c, n]) => [nameKey(c.name), n]);
+  if (fieldNames.some(([, n]) => n > 1) || new Set(fieldNames.map(([k]) => k)).size < fieldNames.length) issues.push("The battlefields must all be different.");
+  for (const c of [L, ...all.map(([c]) => c)]) if (BANNED.has(nameKey(c.name))) warnings.push(`${plainName(c)} is banned in Standard.`);
+  return { main, runes, fields, issues: [...new Set(issues)], warnings: [...new Set(warnings)], legal: !issues.length };
+}
+
+function deckNeeds(d) {  // what you own of the deck, and what the rest costs
+  const need = new Map();
+  const add = (c, n) => need.set(nameKey(c.name), (need.get(nameKey(c.name)) || 0) + n);
+  if (byId[d.legend]) add(byId[d.legend], 1);
+  for (const [c, n] of deckEntries(d)) add(c, n);
+  let total = 0, have = 0, cost = 0, unpriced = 0;
+  for (const [k, n] of need) {
+    const own = Math.min(n, ownedByName(k)), p = cheapest(k);
+    total += n; have += own;
+    if (n > own) { if (p == null) unpriced += n - own; else cost += (n - own) * p; }
+  }
+  return { total, have, cost, unpriced };
+}
+
+function saveDeck(d) {
+  pendingDecks.set(d.id, { ...d, updated_at: new Date().toISOString() });
+  if (keep()) status("Saving…");
+  schedule();
+}
+
+function changeDeck(c, delta) {
+  const d = structuredClone(deckOf(ui.deck)), L = byId[d.legend];
+  d.cards ||= {};
+  if (delta > 0 && !d.champion && isChampionFor(c, L)) d.champion = c.id;  // the first copy of your champion becomes the Chosen Champion
+  else if (delta > 0) d.cards[c.id] = (d.cards[c.id] || 0) + 1;
+  else if (d.cards[c.id] > 0) { if (!--d.cards[c.id]) delete d.cards[c.id]; }
+  else if (d.champion === c.id) d.champion = null;
+  else return;
+  saveDeck(d);
+  renderAll();
+}
+
+function makeChampion(c) {
+  const d = structuredClone(deckOf(ui.deck));
+  if (d.champion) d.cards[d.champion] = (d.cards[d.champion] || 0) + 1;
+  if (d.cards[c.id] > 0 && !--d.cards[c.id]) delete d.cards[c.id];
+  d.champion = c.id;
+  saveDeck(d);
+  renderAll();
+}
+
+function renderDecks() {
+  const decks = allDecks();
+  $("#new-deck").disabled = !editable();
+  $("#no-decks").hidden = decks.length > 0;
+  $("#deck-list").replaceChildren(...decks.map((d) => {
+    const a = el("a", "deck"); a.href = `#deck-${d.id}`;
+    const thumb = el("div", "thumb"); if (byId[d.legend]) sprite(thumb, byId[d.legend]);
+    const info = el("div");
+    const chk = checkDeck(d), own = deckNeeds(d);
+    info.append(el("h2", "", d.name || "Untitled deck"), el("p", "", byId[d.legend] ? plainName(byId[d.legend]) : "No legend yet"));
+    info.append(el("p", "num", `${chk.main} cards, ${chk.runes} runes, ${chk.fields} battlefields`));
+    info.append(el("p", chk.legal ? "ok" : "bad", chk.legal ? "Legal" : `${chk.issues.length} ${chk.issues.length === 1 ? "issue" : "issues"} to fix`));
+    if (own.total) info.append(el("p", "num", own.have === own.total ? "You own every card." : `You own ${own.have} of ${own.total} cards. The rest cost about ${euro(own.cost)}.`));
+    a.append(thumb, info);
+    return a;
+  }));
+}
+
+function newDeck() {
+  if (!editable()) return;
+  const d = { id: crypto.randomUUID(), name: "Untitled deck", legend: null, champion: null, cards: {} };
+  saveDeck(d);
+  location.hash = `deck-${d.id}`;
+}
+
+let pool = null;  // the card pool built for one legend: { legend, tiles: Map(name key -> tile) }
+function renderEditor() {
+  const d = deckOf(ui.deck);
+  if (!d) {
+    // A deck link can open before the session and decks have loaded on this device.
+    if (!sessionKnown || (user && !loadedOnce)) { $("#legend-pick").hidden = $("#editor").hidden = true; return; }
+    location.replace("#decks");  // replace, so Back doesn't return to the missing deck
+    return;
+  }
+  $("#deck-name").disabled = !editable();
+  $("#delete-deck").disabled = !editable();
+  if (document.activeElement !== $("#deck-name")) $("#deck-name").value = d.name;
+  const L = byId[d.legend];
+  $("#legend-pick").hidden = !!L;
+  $("#editor").hidden = !L;
+  if (!L) return renderLegendPick();
+  if (!pool || pool.legend !== L.id) buildPool(L);
+  for (const [k, t] of pool.tiles) {
+    const n = deckCount(d, k);
+    t.tile.classList.toggle("missing", !ownedByName(k));
+    t.qty.hidden = !n; t.qty.textContent = n;
+  }
+  filterPool();
+  renderDeckList(d, L);
+}
+
+function renderLegendPick() {
+  const grid = $("#legend-grid");
+  if (!grid.children.length) {
+    for (const c of Object.values(firstOf).filter((x) => x.type === "Legend")) {
+      const t = makeTile(c, `Choose ${plainName(c)}`);
+      t.add.remove();
+      t.tile.dataset.k = nameKey(c.name);
+      grid.append(t.tile);
+    }
+    grid.addEventListener("click", (e) => {
+      const b = e.target.closest(".art"); if (!b || !editable()) return;
+      const d = structuredClone(deckOf(ui.deck));
+      d.legend = b.dataset.id; d.champion = null;
+      saveDeck(d);
+      renderAll();
+    });
+  }
+  for (const t of grid.children) {
+    t.classList.toggle("missing", !ownedByName(t.dataset.k));
+    t.hidden = !!ui.legendQ && !hasWords(t.dataset.k, ui.legendQ);
+  }
+}
+
+function buildPool(L) {
+  pool = { legend: L.id, tiles: new Map() };
+  const grid = $("#pool-grid"); grid.replaceChildren();
+  for (const [k, c] of Object.entries(firstOf)) {
+    if (!allowedIn(c, L)) continue;
+    const t = makeTile(c);
+    t.add.setAttribute("aria-label", `Add ${plainName(c)} to the deck`);
+    t.tile.dataset.k = k; t.tile.dataset.type = isChampionFor(c, L) ? "Champion" : c.type;
+    pool.tiles.set(k, t);
+    grid.append(t.tile);
+  }
+  const types = [["", "All"], ["Champion", "Champions"], ...DECK_SECTIONS];
+  $("#pool-types").replaceChildren(...types.map(([t, label]) => {
+    const b = el("button", "chip", label); b.type = "button"; b.dataset.type = t; return b;
+  }));
+}
+
+function filterPool() {
+  for (const t of pool.tiles.values()) {
+    const ty = t.tile.dataset.type;
+    t.tile.hidden = (ui.poolType && ty !== ui.poolType && !(ui.poolType === "Unit" && ty === "Champion"))
+      || (ui.poolQ && !hasWords(t.tile.dataset.k, ui.poolQ));
+  }
+  for (const b of $("#pool-types").children) b.setAttribute("aria-pressed", b.dataset.type === ui.poolType);
+}
+
+function renderDeckList(d, L) {
+  const chk = checkDeck(d), own = deckNeeds(d);
+  const legend = el("div", "legend-row");
+  const thumb = el("div", "thumb"); sprite(thumb, L);
+  const info = el("div");
+  const doms = el("div", "tags"); for (const dm of L.domain) doms.append(domainTag(dm));
+  const change = el("button", "link", "Change legend"); change.type = "button"; change.disabled = !editable();
+  change.onclick = () => { saveDeck({ ...structuredClone(d), legend: null, champion: null }); renderAll(); };
+  info.append(el("h2", "", plainName(L)), doms, change);
+  legend.append(thumb, info);
+
+  const tally = el("div", "tally");
+  for (const [v, goal, label, ok] of [[chk.main, 40, "Main deck", chk.main >= 40], [chk.runes, 12, "Runes", chk.runes === 12], [chk.fields, 3, "Battlefields", chk.fields === 3]]) {
+    const t = el("div"); t.append(el("b", ok ? "ok" : "", `${v}/${goal}`), el("span", "", label)); tally.append(t);
+  }
+  const ownLine = el("p", "num", own.have === own.total ? "You own every card in this deck."
+    : `You own ${own.have} of ${own.total} cards. The missing ones cost about ${euro(own.cost)} at Cardmarket trend prices${own.unpriced ? `, plus ${own.unpriced} without a price` : ""}.`);
+  ownLine.style.margin = "0";
+  const checks = el("ul", "checks");
+  if (chk.legal) checks.append(el("li", "ok", "This deck is legal."));
+  for (const t of chk.issues) checks.append(el("li", "bad", t));
+  for (const t of chk.warnings) checks.append(el("li", "warn", t));
+
+  const sections = [];
+  if (byId[d.champion]) sections.push(["Chosen Champion", [[byId[d.champion], 1]]]);
+  const entries = Object.entries(d.cards || {}).map(([id, n]) => [byId[id], n]).filter(([c, n]) => c && n > 0);
+  for (const [type, label] of DECK_SECTIONS) {
+    const rows = entries.filter(([c]) => c.type === type).sort(([a], [b]) => (a.cost ?? 99) - (b.cost ?? 99) || a.name.localeCompare(b.name));
+    if (rows.length) sections.push([label, rows]);
+  }
+  const lists = sections.map(([label, rows]) => {
+    const s = el("div", "section");
+    const h = el("h3"); h.append(el("span", "", label), el("span", "num", rows.reduce((x, [, n]) => x + n, 0)));
+    const ul = el("ul", "lines");
+    for (const [c, n] of rows) {
+      const line = el("li", "line");
+      const minus = el("button", "step", "−"), plus = el("button", "step", "+");
+      minus.type = plus.type = "button";
+      minus.setAttribute("aria-label", `Remove one ${plainName(c)}`); plus.setAttribute("aria-label", `Add one ${plainName(c)}`);
+      minus.onclick = () => changeDeck(c, -1); plus.onclick = () => changeDeck(c, 1);
+      const nm = el("button", "nm", plainName(c)); nm.type = "button"; nm.onclick = () => openCard(c);
+      const k = nameKey(c.name), short = Math.max(0, deckCount(d, k) - ownedByName(k));
+      line.append(minus, el("span", "n", n), nm, el("span", "need", short ? `need ${short}` : ""), plus);
+      ul.append(line);
+    }
+    s.append(h, ul);
+    return s;
+  });
+  if (!lists.length) lists.push(el("p", "muted", "Add cards from the list. The first copy of your champion becomes the Chosen Champion."));
+  $("#decklist").replaceChildren(legend, tally, ownLine, checks, ...lists);
+}
+
+function buildDecks() {
+  $("#new-deck").addEventListener("click", newDeck);
+  $("#deck-name").addEventListener("input", (e) => { const d = deckOf(ui.deck); if (d && editable()) saveDeck({ ...d, name: e.target.value }); });
+  $("#delete-deck").addEventListener("click", () => {
+    const d = deckOf(ui.deck);
+    if (!d || !editable() || !confirm(`Delete "${d.name}"? This can't be undone.`)) return;
+    pendingDecks.set(d.id, null);
+    keep(); schedule();
+    location.replace("#decks");
+  });
+  $("#pool-grid").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    const c = byId[b.dataset.id];
+    if (b.classList.contains("add")) { if (editable()) changeDeck(c, 1); }
+    else openCard(c);
+  });
+  $("#pool-types").addEventListener("click", (e) => { const b = e.target.closest(".chip"); if (b) { ui.poolType = b.dataset.type; filterPool(); } });
+  $("#pool-q").addEventListener("input", (e) => { ui.poolQ = e.target.value.trim().toLowerCase(); filterPool(); });
+  $("#legend-q").addEventListener("input", (e) => { ui.legendQ = e.target.value.trim().toLowerCase(); renderLegendPick(); });
+  document.querySelector(".pane-switch").addEventListener("click", (e) => {
+    const b = e.target.closest(".chip"); if (!b) return;
+    $("#editor").dataset.pane = b.dataset.pane;
+    for (const x of document.querySelectorAll(".pane-switch .chip")) x.setAttribute("aria-pressed", x === b);
+  });
+}
+
+/* ---------- Views ---------- */
+
+function route() {
+  let h = "";
+  try { h = decodeURIComponent(location.hash.slice(1)); } catch (e) { console.warn("Ignoring a malformed address:", e); }
+  ui.deck = h.startsWith("deck-") ? h.slice(5) : null;
+  const view = ui.deck ? "deck" : h === "decks" ? "decks" : "collection";
+  for (const v of ["collection", "decks", "deck"]) $(`#view-${v}`).hidden = v !== view;
+  for (const a of document.querySelectorAll("[data-tab]")) {
+    if (a.dataset.tab === (view === "deck" ? "decks" : view)) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+  }
+  if (view === "deck") { pool = null; $("#pool-q").value = ""; ui.poolQ = ""; ui.poolType = ""; }
+  renderAll();
+  window.scrollTo(0, 0);
+}
+
+function renderAll() {
+  renderCollection();
+  if (!$("#view-decks").hidden) renderDecks();
+  if (!$("#view-deck").hidden) renderEditor();
+  if ($("#card").open) renderCard();
+}
+
+/* ---------- Sync ---------- */
+
 async function flush() {
-  if (!editable() || !pending.size) return;
-  const batch = new Map(pending);
+  if (!editable() || (!pending.size && !pendingDecks.size)) return;
+  const owned = new Map(pending), decks = new Map(pendingDecks), uid = user.id;
+  const upserts = [...decks.values()].filter(Boolean).map((d) => ({ ...d, user_id: uid }));
+  const deletes = [...decks].filter(([, d]) => !d).map(([id]) => id);
   let error;
   try {
-    ({ error } = await sb.from("owned").upsert([...batch].map(([card_id, n]) => ({ user_id: user.id, card_id, n }))));
+    if (owned.size) ({ error } = await sb.from("owned").upsert([...owned].map(([card_id, n]) => ({ user_id: uid, card_id, n }))));
+    if (!error && upserts.length) ({ error } = await sb.from("decks").upsert(upserts));
+    if (!error && deletes.length) ({ error } = await sb.from("decks").delete().in("id", deletes));
   } catch (e) {
     error = e;
   }
+  if (user?.id !== uid) return;  // signed out or switched account during the save
   if (error) {
-    const what = `${fmt(pending.size)} change${pending.size > 1 ? "s" : ""}`;
+    const n = pending.size + pendingDecks.size, what = `${fmt(n)} change${n > 1 ? "s" : ""}`;
     if (error.code) {  // the database refused the request; sending it again can't succeed
       status(`${what} refused by the database (${error.message}). They're kept on this device.`, true);
+      $("#discard").hidden = false;  // otherwise the queue, and sign-out, stay stuck
     } else {           // no connection: try again later, and on reconnect or reopening the app
       status(`${what} not saved yet: no connection. They're kept on this device and save once you're back online.`, true);
       clearTimeout(flushTimer);
@@ -378,12 +970,19 @@ async function flush() {
     }
     return;
   }
-  for (const [id, n] of batch) {
+  // Writes are absolute, so anything that only partly landed before an error
+  // is simply sent again next time.
+  for (const [id, n] of owned) {
     if (n > 0) saved[id] = n; else delete saved[id];
     if (pending.get(id) === n) pending.delete(id);  // a tap made during the save stays pending
   }
+  for (const [id, d] of decks) {
+    if (d) savedDecks[id] = d; else delete savedDecks[id];
+    if (pendingDecks.get(id) === d) pendingDecks.delete(id);
+  }
   keep();
-  if (!pending.size) status("All changes saved");
+  $("#discard").hidden = true;
+  if (!pending.size && !pendingDecks.size) status(IDLE);
 }
 
 async function load() {
@@ -393,39 +992,46 @@ async function load() {
   // would skip a row whenever another device zeroed one mid-read.
   for (let last = ""; ;) {
     const { data, error } = await sb.from("owned").select("card_id,n").gt("n", 0).gt("card_id", last).order("card_id").limit(1000);
-    if (error) {
-      const why = error.code ? error.message : "no connection";
-      status(`Couldn't load your saved collection (${why}). ${editable() ? "Showing the copy kept on this device." : "Changes are off until it loads."}`, true);
-      return;
-    }
+    if (error) return loadFailed(error);
     rows.push(...data);
     if (data.length < 1000) break;
     last = data[data.length - 1].card_id;
   }
+  const { data: decks, error } = await sb.from("decks").select("id,name,legend,champion,cards,updated_at").limit(1000);
+  if (error) return loadFailed(error);
   saved = Object.fromEntries(rows.map((r) => [r.card_id, r.n]));
+  savedDecks = Object.fromEntries(decks.map((d) => [d.id, d]));
   owner = user.id;
+  loadedOnce = true;
   keep();
   renderAll();
-  status(pending.size ? "Saving…" : IDLE);
-  if (pending.size) serial(flush);
+  status(pending.size || pendingDecks.size ? "Saving…" : IDLE);
+  if (pending.size || pendingDecks.size) serial(flush);
+}
+
+function loadFailed(error) {
+  const why = error.code ? error.message : "no connection";
+  status(`Couldn't load your saved data (${why}). ${editable() ? "Showing the copy kept on this device." : "Changes are off until it loads."}`, true);
 }
 
 function onSession(session) {
   const before = user?.id;
   user = session?.user || null;
+  sessionKnown = true;
   if (user && owner && owner !== user.id) {  // another account: this device's copy isn't theirs
-    saved = {}; pending.clear(); owner = null; keep();
+    saved = {}; savedDecks = {}; pending.clear(); pendingDecks.clear(); owner = null; keep();
   }
   $("#login").hidden = !!user;
   $("#who").hidden = !user;
   $("#who-email").textContent = user?.email || "";
   renderAll();
-  if (!user) status("Sign in to change your collection.");
+  if (!user) status("");
   else if (user.id !== before) { status("Loading your collection…"); serial(flush); serial(load); }
 }
 
 function connect() {
   if (!sb) {
+    sessionKnown = true;
     status("Sync isn't set up: add your Supabase URL and key at the top of the page's script.", true);
     return;
   }
@@ -440,10 +1046,17 @@ function connect() {
   });
   $("#signout").addEventListener("click", async () => {
     await serial(flush);
-    if (pending.size) { status("Some changes aren't saved yet. Sign out once you have a connection.", true); return; }
+    if (pending.size || pendingDecks.size) { status("Some changes aren't saved yet. Sign out once you have a connection.", true); return; }
     const { error } = await sb.auth.signOut();
     if (error) { status(`Couldn't sign out: ${error.message}`, true); return; }
-    saved = {}; owner = null; keep(); renderAll();
+    saved = {}; savedDecks = {}; owner = null; keep(); renderAll();
+  });
+  $("#discard").addEventListener("click", () => {
+    const n = pending.size + pendingDecks.size;
+    if (!confirm(`Discard ${n} unsaved change${n > 1 ? "s" : ""}? This can't be undone.`)) return;
+    pending.clear(); pendingDecks.clear(); keep();
+    $("#discard").hidden = true;
+    serial(load);
   });
   window.addEventListener("online", () => serial(flush));
   document.addEventListener("visibilitychange", () => {
@@ -464,10 +1077,27 @@ async function boot() {
     status(`Couldn't load the card list (${e.message}). Reload the page to try again.`, true);
     return;
   }
-  buildFilters();
-  buildGrid();
-  renderAll();
+  cards.forEach((c, i) => {
+    c.i = i; byId[c.id] = c;
+    const k = nameKey(c.name);
+    (printings[k] ||= []).push(c);
+    if (!firstOf[k] || (firstOf[k].variant && !c.variant)) firstOf[k] = c;  // decks use the standard printing
+  });
+  try {  // prices are optional: the page works without them
+    const res = await fetch("prices.json");
+    if (res.ok) {
+      const p = await res.json();
+      prices = p.trend;
+      pricesDate = new Date(p.updated).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+    }
+  } catch (e) {
+    console.warn("No prices:", e);
+  }
+  buildCollection();
+  buildDecks();
   applyFilters();
+  window.addEventListener("hashchange", route);
+  route();
   connect();
 }
 boot();
