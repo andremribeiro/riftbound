@@ -9,6 +9,7 @@ Riot's image CDN answers 403 to requests from other sites; it is packed into
 sprite sheets so the page loads 33 files instead of one per card.
 """
 
+import hashlib
 import html
 import io
 import json
@@ -242,7 +243,9 @@ def main(out):
     ]
     set_meta = [{"id": s["set_id"], "name": s["name"]} for s in sets if s["set_id"] in {c["set"] for c in cards}]
     with open(out / "cards.json", "w") as fh:
-        fh.write('{"sets":' + json.dumps(set_meta) + ',"tile":[%d,%d,%d,%d],"cards":[\n' % (TILE_W, TILE_H, COLS, ROWS))
+        # The page adds the build id to sheet URLs, so a phone never pairs new card data with cached old sheets.
+        build_id = hashlib.sha1("\n".join(c["id"] for c in cards).encode()).hexdigest()[:10]
+        fh.write('{"build":"%s","sets":' % build_id + json.dumps(set_meta) + ',"tile":[%d,%d,%d,%d],"cards":[\n' % (TILE_W, TILE_H, COLS, ROWS))
         fh.write(",\n".join(json.dumps(c, ensure_ascii=False) for c in cards))
         fh.write("\n]}\n")
     print(f"{len(cards)} cards, {len(set_meta)} sets, {-(-len(cards) // PER_SHEET)} sheets, {len(missing)} without art")

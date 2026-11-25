@@ -348,7 +348,7 @@ function nameKey(name) {
 }
 const plainName = (c) => c.name.replace(/\s*\((Overnumbered|Alternate Art|Signature|Metal)\)\s*$/, "");
 
-let cards = [], sets = [], byId = {}, COLS, ROWS, prices = {}, pricesDate = null, user = null, flushTimer;
+let cards = [], sets = [], byId = {}, COLS, ROWS, BUILD = "", prices = {}, pricesDate = null, user = null, flushTimer;
 let sessionKnown = false, loadedOnce = false;  // has auth answered; has this visit loaded from Supabase
 let decksError = null;                         // why decks didn't load on the last attempt, if they didn't
 const printings = {};  // name key -> every printing, in collector order
@@ -436,7 +436,7 @@ function rulesText(text) {
 // Art is packed 40 to a sheet (see build.py); a card's sheet and slot follow from its index.
 function sprite(node, c) {
   const per = COLS * ROWS, p = c.i % per;
-  node.style.backgroundImage = `url(sheets/${Math.floor(c.i / per)}.webp)`;
+  node.style.backgroundImage = `url(sheets/${Math.floor(c.i / per)}.webp?v=${BUILD})`;
   node.style.backgroundPosition = `${(p % COLS) / (COLS - 1) * 100}% ${Math.floor(p / COLS) / (ROWS - 1) * 100}%`;
 }
 const artIO = new IntersectionObserver((entries) => {
@@ -1073,10 +1073,12 @@ function connect() {
 
 async function boot() {
   try {
-    const res = await fetch("cards.json");
+    // no-cache: revalidate on every load, so a new set shows up as soon as it's published.
+    const res = await fetch("cards.json", { cache: "no-cache" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     ({ cards, sets } = data);
+    BUILD = data.build || "";
     [, , COLS, ROWS] = data.tile;
   } catch (e) {
     status(`Couldn't load the card list (${e.message}). Reload the page to try again.`, true);
@@ -1089,7 +1091,7 @@ async function boot() {
     if (!firstOf[k] || (firstOf[k].variant && !c.variant)) firstOf[k] = c;  // decks use the standard printing
   });
   try {  // prices are optional: the page works without them
-    const res = await fetch("prices.json");
+    const res = await fetch("prices.json", { cache: "no-cache" });
     if (res.ok) {
       const p = await res.json();
       prices = p.trend;
