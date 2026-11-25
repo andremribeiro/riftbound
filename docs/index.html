@@ -106,6 +106,10 @@ input[type="search"], input[type="email"], input[type="password"], .deck-name {
 /* Collection */
 .head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 16px; padding-block: 8px 16px; }
 .summary { margin: 6px 0 0; color: var(--ink-2); max-width: 60ch; }
+.worth { display: grid; justify-items: end; gap: 2px; text-align: right; }
+.worth-value { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.worth-label { font-size: 13px; color: var(--ink-2); max-width: 32ch; }
+@media (max-width: 560px) { .worth { justify-items: start; text-align: left; } }
 .summary strong { color: var(--ink); font-weight: 600; }
 .toolbar {
   position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; display: flex; gap: 8px; padding-block: 10px;
@@ -262,6 +266,10 @@ dialog.sheet::backdrop { background: rgb(8 10 14 / .5); }
       <div>
         <h1>Collection</h1>
         <p class="summary" id="summary"></p>
+      </div>
+      <div class="worth" id="worth" hidden>
+        <span class="worth-value" id="worth-value"></span>
+        <span class="worth-label" id="worth-label"></span>
       </div>
     </div>
     <div class="toolbar">
@@ -562,18 +570,20 @@ function renderCount() {
 
 function renderCollection() {
   document.body.classList.toggle("ro", !editable());
-  let owned = 0, copies = 0, worth = 0;
+  let owned = 0, copies = 0, worth = 0, unpriced = 0;
   for (const c of cards) {
     const k = qty(c);
     c.t.tile.classList.toggle("missing", !k);
     c.t.qty.hidden = !k;
     c.t.qty.textContent = k;
-    if (k) { owned++; copies += k; worth += k * (prices[c.id] || 0); }
+    if (k) { owned++; copies += k; if (prices[c.id] == null) unpriced++; else worth += k * prices[c.id]; }
   }
-  const s = $("#summary");
-  s.replaceChildren("You own ", el("strong", "num", fmt(owned)), ` of ${fmt(cards.length)} cards (${fmt(copies)} copies)`);
-  if (pricesDate && worth > 0) s.append(", worth about ", el("strong", "num", euro(worth)), ` at Cardmarket trend prices from ${pricesDate}.`);
-  else s.append(".");
+  $("#summary").replaceChildren("You own ", el("strong", "num", fmt(owned)), ` of ${fmt(cards.length)} cards (${fmt(copies)} copies).`);
+  // The value counter: every copy you own at its printing's Cardmarket trend price, recounted on each change.
+  $("#worth").hidden = !pricesDate;
+  $("#worth-value").textContent = euro(worth);
+  $("#worth-label").textContent = `Collection value at Cardmarket trend prices, ${pricesDate}`
+    + (unpriced ? `. ${fmt(unpriced)} owned ${unpriced === 1 ? "card has" : "cards have"} no price.` : "");
   for (const b of $("#sets").children) {
     const pool = b.dataset.set === "all" ? cards : cards.filter((c) => c.set === b.dataset.set);
     const have = pool.filter((c) => qty(c) > 0).length;

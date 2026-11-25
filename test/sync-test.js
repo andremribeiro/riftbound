@@ -92,6 +92,9 @@ function legalDeck() {
       await sleep(1000);
       ok("three quick taps saved in one request", __calls === 1 && server() === 5);
       ok("the tile shows the count", c.t.qty.textContent === "5" && !c.t.tile.classList.contains("missing"));
+      const expected = cards.reduce((sum, x) => sum + qty(x) * (prices[x.id] || 0), 0);
+      ok("the value counter is copies times trend price", prices[c.id] > 0 && !$("#worth").hidden && $("#worth-value").textContent === euro(expected)
+        && Math.abs(expected - 5 * prices[c.id]) < 1e-9);
       ok("the shown count follows taps", $("#count").textContent.endsWith(", 1 owned"));
 
       add.click(); await sleep(620); add.click();  // second tap lands while the first save is in flight
