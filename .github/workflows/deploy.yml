@@ -1,0 +1,37 @@
+# Publishes docs/ to GitHub Pages with fresh Cardmarket prices: on every push
+# to main, and daily after Cardmarket updates its price guide (about 01:40 UTC).
+# prices.json is made here rather than committed, so the history stays clean.
+name: Deploy site
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      # If Cardmarket is down, keep the prices already live instead of blocking the deploy.
+      - run: |
+          python3 prices.py docs || {
+            echo "::warning::Cardmarket prices failed; keeping the live prices.json"
+            curl -fsS --retry 3 -o docs/prices.json "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/prices.json" \
+              || echo "::warning::No live prices.json either; deploying without prices"
+          }
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
