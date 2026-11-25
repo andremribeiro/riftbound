@@ -9,8 +9,10 @@ Riot's image CDN answers 403 to requests from other sites; it is packed into
 sprite sheets so the page loads 33 files instead of one per card.
 """
 
+import html
 import io
 import json
+import re
 import sys
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -56,6 +58,15 @@ def fetch_art(url):
         except Exception as e:  # retried, then reported by the caller
             last = e
     raise last
+
+
+def rules_text(text):
+    """The rich text as plain lines; the page draws the :rb_...: icon codes."""
+    rich = text.get("rich") or ""
+    if not rich:
+        return text.get("plain") or ""
+    rich = re.sub(r"<li>", "\u2022 ", re.sub(r"</p>|<br\s*/?>|</li>", "\n", rich))
+    return re.sub(r"\n{2,}", "\n", html.unescape(re.sub(r"<[^>]+>", "", rich))).strip()
 
 
 def main(out):
@@ -125,6 +136,16 @@ def main(out):
             "type": c["classification"]["type"],
             "domain": c["classification"]["domain"] or [],
             "variant": variant(c),
+            # Deck rules: Champion units and Signature cards are tied to a
+            # legend through tags; Tokens can't go in a deck.
+            "super": c["classification"]["supertype"],
+            "tags": c["tags"] or [],
+            "cost": c["attributes"]["energy"],
+            "might": c["attributes"]["might"],
+            "power": c["attributes"]["power"],
+            "text": rules_text(c["text"]),
+            "image": c["media"].get("image_url") or "",
+            "landscape": c["orientation"] == "landscape",
             "art": c["key"] not in missing,
             # The page derives sheet and slot from the card's index in this list.
         }
