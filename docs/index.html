@@ -467,7 +467,8 @@ function makeTile(c, label) {
 
 function buildCollection() {
   const frag = document.createDocumentFragment();
-  for (const c of cards) {
+  const rank = Object.fromEntries(sets.map((s, i) => [s.id, i]));
+  for (const c of [...cards].sort((a, b) => rank[a.set] - rank[b.set] || a.i - b.i)) {  // grid follows the set order
     c.t = makeTile(c);
     c.t.add.setAttribute("aria-label", `Add a copy of ${c.name}`);
     frag.append(c.t.tile);
@@ -1080,6 +1081,9 @@ async function boot() {
     ({ cards, sets } = data);
     BUILD = data.build || "";
     [, , COLS, ROWS] = data.tile;
+    // Newest set first: it's the one being opened. Promo sets stay last.
+    const promo = (s) => s.name.includes("Promotional");
+    sets = [...sets.filter((s) => !promo(s)).reverse(), ...sets.filter(promo)];
   } catch (e) {
     status(`Couldn't load the card list (${e.message}). Reload the page to try again.`, true);
     return;
