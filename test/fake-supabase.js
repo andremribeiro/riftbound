@@ -7,7 +7,7 @@ window.__db = [
   { card_id: "ogn-001-298", n: 2 },
   ...Array.from({ length: 1200 }, (_, i) => ({ card_id: "x" + String(i).padStart(4, "0"), n: 1 })),
 ];
-window.__decks = [];
+window.__decks = []; window.__signups = []; window.__resets = []; window.__newPassword = null;
 const restart = location.search.includes("restart");
 const noDecks = location.search.includes("nodecks");  // a project where supabase.sql's decks table was never created
 localStorage.clear();
@@ -25,6 +25,10 @@ window.supabase = { createClient() {
   const auth = {
     onAuthStateChange(fn) { cb = fn; setTimeout(() => fn("INITIAL_SESSION", restart ? session : null), 0); return { data: { subscription: { unsubscribe() {} } } }; },
     async signInWithPassword() { setTimeout(() => cb("SIGNED_IN", session), 0); return { error: null }; },
+    // With email confirmation on, sign-up returns a user but no session.
+    async signUp({ email }) { __signups.push(email); return { data: { user: { id: "u2", email }, session: null }, error: null }; },
+    async resetPasswordForEmail(email) { __resets.push(email); return { data: {}, error: null }; },
+    async updateUser({ password }) { __newPassword = password; return { data: {}, error: null }; },
     async signOut() {
       if (__signOutFail) return { error: { message: "Failed to fetch" } };
       setTimeout(() => cb("SIGNED_OUT", null), 0);
@@ -71,5 +75,6 @@ window.supabase = { createClient() {
     };
     return q;
   };
+  window.__recover = () => cb("PASSWORD_RECOVERY", session);  // what a reset-email link triggers
   return { auth, from };
 } };

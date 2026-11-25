@@ -101,6 +101,7 @@ input[type="search"], input[type="email"], input[type="password"], .deck-name {
 .login { display: flex; flex-wrap: wrap; gap: 8px; padding: 16px; margin-bottom: 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); }
 .login p { flex-basis: 100%; margin: 0 0 4px; }
 .login input { flex: 1 1 200px; }
+.login .login-alt { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 4px 0 0; font-size: 14px; }
 
 /* Collection */
 .head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 16px; padding-block: 8px 16px; }
@@ -245,10 +246,15 @@ dialog.sheet::backdrop { background: rgb(8 10 14 / .5); }
   <p class="status" id="status" role="status">Loading the card list…</p>
   <button type="button" class="btn danger" id="discard" hidden>Discard unsaved changes</button>
   <form class="login" id="login" hidden>
-    <p>Sign in to track your cards and build decks.</p>
+    <p id="login-intro">Sign in to track your cards and build decks.</p>
     <input type="email" id="email" autocomplete="username" placeholder="Email" aria-label="Email" required>
     <input type="password" id="password" autocomplete="current-password" placeholder="Password" aria-label="Password" required>
-    <button type="submit" class="btn primary">Sign in</button>
+    <button type="submit" class="btn primary" id="login-go">Sign in</button>
+    <p class="login-alt">
+      <button type="button" class="link" data-mode="signup">Create an account</button>
+      <button type="button" class="link" data-mode="reset">Forgot password?</button>
+      <button type="button" class="link" data-mode="signin">Back to sign in</button>
+    </p>
   </form>
 
   <section id="view-collection">
@@ -566,7 +572,7 @@ function renderCollection() {
   }
   const s = $("#summary");
   s.replaceChildren("You own ", el("strong", "num", fmt(owned)), ` of ${fmt(cards.length)} cards (${fmt(copies)} copies)`);
-  if (pricesDate) s.append(", worth about ", el("strong", "num", euro(worth)), ` at Cardmarket trend prices from ${pricesDate}.`);
+  if (pricesDate && worth > 0) s.append(", worth about ", el("strong", "num", euro(worth)), ` at Cardmarket trend prices from ${pricesDate}.`);
   else s.append(".");
   for (const b of $("#sets").children) {
     const pool = b.dataset.set === "all" ? cards : cards.filter((c) => c.set === b.dataset.set);
@@ -1027,7 +1033,9 @@ function onSession(session) {
   if (user && owner && owner !== user.id) {  // another account: this device's copy isn't theirs
     saved = {}; savedDecks = {}; pending.clear(); pendingDecks.clear(); owner = null; keep();
   }
-  $("#login").hidden = !!user;
+  // Supabase's email links come back with tokens or an error in the address; don't leave them there.
+  if (/access_token|error_description|type=recovery/.test(location.hash)) history.replaceState(null, "", location.pathname + location.search);
+  $("#login").hidden = !!user && loginMode !== "newpass";
   $("#who").hidden = !user;
   $("#who-email").textContent = user?.email || "";
   renderAll();
@@ -1035,20 +1043,72 @@ function onSession(session) {
   else if (user.id !== before) { status("Loading your collection…"); serial(flush); serial(load); }
 }
 
+let loginMode = "signin";
+const LOGIN = {  // intro, button, which inputs show, password autocomplete, which mode links show
+  signin: ["Sign in to track your cards and build decks.", "Sign in", true, true, "current-password", ["signup", "reset"]],
+  signup: ["Create an account to track your cards and build decks.", "Create account", true, true, "new-password", ["signin"]],
+  reset: ["Enter your email and we'll send a link to set a new password.", "Send reset link", true, false, "", ["signin"]],
+  newpass: ["Choose a new password for your account.", "Save password", false, true, "new-password", []],
+};
+function setLoginMode(mode) {
+  const [intro, go, email, password, auto, links] = LOGIN[mode];
+  loginMode = mode;
+  $("#login-intro").textContent = intro;
+  $("#login-go").textContent = go;
+  $("#email").hidden = !email; $("#email").required = email;
+  $("#password").hidden = !password; $("#password").required = password;
+  $("#password").autocomplete = auto || "off";
+  $("#password").minLength = mode === "signup" || mode === "newpass" ? 8 : 0;
+  for (const b of document.querySelectorAll(".login-alt [data-mode]")) b.hidden = !links.includes(b.dataset.mode);
+  if (mode === "newpass") $("#login").hidden = false;
+}
+
 function connect() {
+  setLoginMode("signin");
   if (!sb) {
     sessionKnown = true;
     status("Sync isn't set up: add your Supabase URL and key at the top of the page's script.", true);
     return;
   }
+  const linkError = new URLSearchParams(location.hash.slice(1)).get("error_description");
+  if (linkError) status(`That email link didn't work: ${linkError}. Ask for a new one below.`, true);
   // Supabase calls must not run inside the auth callback itself, hence the timeout.
-  sb.auth.onAuthStateChange((_event, session) => setTimeout(() => onSession(session), 0));
+  sb.auth.onAuthStateChange((event, session) => setTimeout(() => {
+    if (event === "PASSWORD_RECOVERY") setLoginMode("newpass");  // arrived from a reset email, signed in to choose a new password
+    onSession(session);
+  }, 0));
+  document.querySelector(".login-alt").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-mode]");
+    if (b) { setLoginMode(b.dataset.mode); status(""); }
+  });
   $("#login").addEventListener("submit", async (e) => {
     e.preventDefault();
-    status("Signing in…");
-    const { error } = await sb.auth.signInWithPassword({ email: $("#email").value.trim(), password: $("#password").value });
-    if (error) status(`Couldn't sign in: ${error.message}`, true);
-    else $("#password").value = "";
+    const email = $("#email").value.trim(), password = $("#password").value;
+    // Links in Supabase's emails come back to this page; its address must be in the project's redirect URLs.
+    const back = location.origin + location.pathname;
+    if (loginMode === "signin") {
+      status("Signing in…");
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) return status(`Couldn't sign in: ${error.message}`, true);
+    } else if (loginMode === "signup") {
+      status("Creating your account…");
+      const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: back } });
+      if (error) return status(`Couldn't create the account: ${error.message}`, true);
+      if (!data.session) { setLoginMode("signin"); status(`Check ${email} for a confirmation link, then sign in.`); }
+    } else if (loginMode === "reset") {
+      status("Sending the reset link…");
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: back });
+      if (error) return status(`Couldn't send the reset link: ${error.message}`, true);
+      setLoginMode("signin");
+      status(`If ${email} has an account, a link to set a new password is on its way.`);
+    } else {
+      const { error } = await sb.auth.updateUser({ password });
+      if (error) return status(`Couldn't save the password: ${error.message}`, true);
+      setLoginMode("signin");
+      $("#login").hidden = !!user;
+      status("New password saved.");
+    }
+    $("#password").value = "";
   });
   $("#signout").addEventListener("click", async () => {
     await serial(flush);

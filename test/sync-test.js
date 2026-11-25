@@ -43,6 +43,10 @@ function legalDeck() {
       await sleep(1000);
       ok("a deck link opened before the decks load shows the deck", location.hash === "#deck-33333333-3333-4333-8333-333333333333"
         && !$("#view-deck").hidden && $("#deck-name").value === "Linked deck");
+      __recover(); await sleep(50);
+      ok("a reset link opens the new-password form", !$("#login").hidden && $("#email").hidden && $("#login-go").textContent === "Save password");
+      $("#password").value = "evenlonger"; $("#login").requestSubmit(); await sleep(100);
+      ok("the new password is saved and the form closes", __newPassword === "evenlonger" && $("#login").hidden);
       ok("a change queued before closing the app saves on the next start", server() === 5 && qty(c) === 5 && !Object.keys(queued()).length);
     } else {
       // Deck rules on real cards
@@ -67,6 +71,16 @@ function legalDeck() {
       ok("a deck without a Chosen Champion is flagged", chk(noChamp).issues.some((t) => t.includes("Chosen Champion")));
 
       ok("signed-out view is read-only", document.body.classList.contains("ro") && !$("#login").hidden);
+      const mode = (m) => document.querySelector(`.login-alt [data-mode="${m}"]`).click();
+      mode("signup"); $("#email").value = "new@example.com"; $("#password").value = "longenough"; $("#login").requestSubmit();
+      await sleep(100);
+      ok("Create account signs up and asks to confirm by email", __signups.includes("new@example.com")
+        && $("#status").textContent.includes("confirmation link") && $("#login-go").textContent === "Sign in");
+      mode("reset");
+      ok("the reset form asks only for an email", $("#password").hidden && !$("#email").hidden);
+      $("#email").value = "me@example.com"; $("#login").requestSubmit();
+      await sleep(100);
+      ok("Forgot password sends a reset link", __resets.includes("me@example.com") && $("#status").textContent.includes("on its way"));
       $("#email").value = "me@example.com"; $("#password").value = "pw"; $("#login").requestSubmit();
       await sleep(10);
       add.click();
