@@ -1,7 +1,8 @@
 """Match Cardmarket's daily Riftbound price guide to the cards in cards.json.
 
 Run:  python3 prices.py [site_dir]      (stdlib only; the deploy workflow runs it daily)
-Writes <site_dir>/prices.json: {"updated": ..., "trend": {card id: euros}}.
+Writes <site_dir>/prices.json: {"updated": ..., "trend": {card id: euros}}: the
+non-foil trend price, or the foil trend for cards that only trade as foil.
 
 Cardmarket publishes the price guide once a day and its files carry no CORS
 headers, so the page can't fetch them itself. The product list has names and
@@ -70,7 +71,9 @@ def main(site):
     data = json.loads((site / "cards.json").read_text())
     products = get_json(f"{CM}/productList/products_singles_{GAME}.json")["products"]
     guide = get_json(f"{CM}/priceGuide/price_guide_{GAME}.json")
-    trend = {g["idProduct"]: g["trend"] for g in guide["priceGuides"] if g.get("trend")}
+    # Many newer cards only trade as foil: no non-foil trend (0), but a foil one.
+    price = lambda g: g.get("trend") or g.get("trend-foil")
+    trend = {g["idProduct"]: price(g) for g in guide["priceGuides"] if price(g)}
 
     by_exp = defaultdict(list)
     for p in products:
