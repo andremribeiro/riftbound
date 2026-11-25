@@ -1,6 +1,8 @@
 # Publishes docs/ to GitHub Pages with fresh Cardmarket prices: on every push
 # to main, and daily after Cardmarket updates its price guide (about 01:40 UTC).
-# prices.json is made here rather than committed, so the history stays clean.
+# The daily run also commits prices.json, so a Pages build from the branch
+# ships prices too (whichever Pages source is set) and the repo never goes
+# quiet long enough for GitHub to switch the schedule off (60 days).
 name: Deploy site
 on:
   push:
@@ -9,7 +11,7 @@ on:
     - cron: "30 3 * * *"
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 concurrency:
@@ -23,13 +25,16 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      # If Cardmarket is down, keep the prices already live instead of blocking the deploy.
-      - run: |
-          python3 prices.py docs || {
-            echo "::warning::Cardmarket prices failed; keeping the live prices.json"
-            curl -fsS --retry 3 -o docs/prices.json "https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/prices.json" \
-              || echo "::warning::No live prices.json either; deploying without prices"
-          }
+      # prices.py only writes prices.json once both downloads succeed, so on a
+      # Cardmarket outage the committed copy from the last good run is kept.
+      - run: python3 prices.py docs || echo "::warning::Cardmarket prices failed; keeping the committed prices.json"
+      - name: Commit the new prices
+        if: github.event_name != 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/prices.json
+          git diff --cached --quiet || { git commit -m "chore(prices): update cardmarket prices" && git push; }
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs
