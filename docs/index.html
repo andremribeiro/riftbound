@@ -1,0 +1,476 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#edf0f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1019" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Riftbound">
+<title>Riftbound Collection</title>
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=JetBrains+Mono:wght@500;700&family=Marcellus+SC&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"
+  integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"></script>
+<style>
+/* Layout: a binder. Masthead with totals, set tabs that double as progress bars,
+   a sticky search bar, then a grid of card pockets; missing cards sit ghosted. */
+:root {
+  --bg: #edf0f5; --panel: #fbfcfe; --ink: #161d2b; --muted: #586276; --line: #d3d9e3; --pocket: #dde2ea;
+  --accent: #8a6514; --on-accent: #fffdf6; --danger: #b3261e;
+  --scrim: rgb(10 14 22 / .8); --on-scrim: #fff;
+  --d-fury: #d0432b; --d-calm: #3f9a55; --d-mind: #3576d0; --d-body: #dd8424; --d-chaos: #8a4cc2; --d-order: #cfa52b; --d-colorless: #8d96a6;
+  --display: "Marcellus SC", Georgia, serif;
+  --text: "Figtree", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1019; --panel: #121927; --ink: #e6e9ef; --muted: #8f99ac; --line: #243049; --pocket: #182030;
+    --accent: #d9b25c; --on-accent: #1a1406; --danger: #f2867e; color-scheme: dark;
+  }
+}
+[hidden] { display: none !important; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 var(--text);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: env(safe-area-inset-top, 0px) calc(40px + env(safe-area-inset-bottom, 0px));
+}
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 1320px; margin: 0 auto; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Repeated taps on one card must count, not zoom (iOS double-tap). */
+button { touch-action: manipulation; }
+
+.masthead { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 8px 24px; padding-block: 28px 14px; }
+h1 { font: 400 clamp(28px, 4.5vw, 40px)/1.05 var(--display); letter-spacing: .03em; margin: 0; text-wrap: balance; }
+.total { display: grid; justify-items: end; gap: 2px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.total strong { font: 700 22px var(--mono); color: var(--ink); }
+@media (max-width: 560px) { .total { justify-items: start; } }
+.status { font-size: 13px; color: var(--muted); min-height: 1.3em; margin: 0 0 10px; }
+.status.err { color: var(--danger); }
+.who { font-size: 13px; color: var(--muted); }
+.link { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+
+.login { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px; margin-bottom: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.login input { flex: 1 1 180px; min-width: 0; }
+.primary { font: 600 15px var(--text); padding: 8px 16px; border: 0; border-radius: 6px; background: var(--accent); color: var(--on-accent); cursor: pointer; }
+
+.sets { display: flex; gap: 8px; overflow-x: auto; padding-block: 4px 12px; scrollbar-width: thin; }
+.set {
+  flex: 0 0 auto; display: grid; gap: 5px; min-width: 132px; padding: 9px 12px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.set[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.set b { font-weight: 600; font-size: 13px; white-space: nowrap; }
+.set small { font: 500 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar { height: 4px; border-radius: 2px; background: var(--pocket); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--accent); }
+
+.toolbar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
+  display: flex; flex-wrap: wrap; gap: 8px; padding-block: 10px; border-bottom: 1px solid var(--line);
+}
+/* 16px: iOS zooms the page when focusing any smaller input. */
+input, select, .seg button { font: inherit; font-size: 16px; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+#q { flex: 1 1 220px; min-width: 0; }
+.seg { display: inline-flex; }
+.seg button { cursor: pointer; border-radius: 0; margin-left: -1px; font-size: 14px; }
+.seg button:first-child { border-radius: 6px 0 0 6px; margin-left: 0; }
+.seg button:last-child { border-radius: 0 6px 6px 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-block: 10px 18px; }
+.filters select { flex: 0 1 auto; min-width: 0; font-size: 14px; }
+.count { margin-left: auto; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 16px 10px; }
+@media (min-width: 700px) { .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 22px 14px; } }
+.card { position: relative; display: grid; gap: 5px; min-width: 0; }
+.pocket {
+  position: relative; display: grid; place-items: center; width: 100%; max-width: 100%; aspect-ratio: 200 / 279;
+  border: 0; padding: 8px; border-radius: 5% / 3.6%; cursor: pointer; color: var(--muted); font: 600 12px var(--text);
+  background: var(--pocket) no-repeat; background-size: 800% 500%;
+}
+.pocket.art { color: transparent; }
+.card:not(.own) .pocket { filter: grayscale(1); opacity: .38; }
+.card:not(.own) .pocket:hover { opacity: .65; }
+.ro .pocket { cursor: default; }
+.ro .card:not(.own) .pocket:hover { opacity: .38; }
+.n {
+  position: absolute; top: 6px; right: 6px; min-width: 26px; height: 26px; padding: 0 7px; border-radius: 13px; box-sizing: border-box;
+  background: var(--accent); color: var(--on-accent); font: 700 13px/26px var(--mono); text-align: center; pointer-events: none;
+}
+/* Three copies is a full playset: the most a Riftbound deck may run. */
+.card.playset .n { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px var(--accent); }
+.sub {
+  position: absolute; top: 4px; left: 4px; width: 34px; height: 34px; border-radius: 17px; border: 0; padding: 0;
+  background: var(--scrim); color: var(--on-scrim); font: 700 19px/34px var(--text); cursor: pointer;
+}
+.meta { display: flex; align-items: center; gap: 6px; font: 500 11px var(--mono); color: var(--muted); min-width: 0; }
+.meta .tag { padding: 0 4px; border: 1px solid var(--line); border-radius: 3px; font-size: 10px; }
+.dots { display: inline-flex; gap: 3px; margin-left: auto; }
+.dots i { width: 8px; height: 8px; border-radius: 50%; }
+.name { font-weight: 600; font-size: 13px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card:not(.own) .name { color: var(--muted); }
+.empty { padding: 48px 0; text-align: center; color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) { .pocket { transition: opacity .15s, filter .15s; } }
+</style>
+</head>
+<body class="ro">
+<div class="wrap">
+  <header class="masthead">
+    <div>
+      <h1>Riftbound Collection</h1>
+      <div class="who" id="who" hidden><span id="who-email"></span> · <button type="button" class="link" id="signout">Sign out</button></div>
+    </div>
+    <div class="total">
+      <div><strong id="owned">0</strong> of <span id="all">0</span> cards</div>
+      <div id="copies">0 copies</div>
+    </div>
+  </header>
+  <p class="status" id="status" role="status">Loading the card list…</p>
+  <form class="login" id="login" hidden>
+    <input type="email" id="email" autocomplete="username" placeholder="Email" aria-label="Email" required>
+    <input type="password" id="password" autocomplete="current-password" placeholder="Password" aria-label="Password" required>
+    <button type="submit" class="primary">Sign in</button>
+  </form>
+  <nav class="sets" id="sets" aria-label="Sets"></nav>
+  <div class="toolbar">
+    <input type="search" id="q" placeholder="Search name or number, e.g. Jinx or OGN 251" aria-label="Search cards">
+    <div class="seg" id="show" role="group" aria-label="Show">
+      <button type="button" data-v="all" aria-pressed="true">All</button>
+      <button type="button" data-v="owned" aria-pressed="false">Owned</button>
+      <button type="button" data-v="missing" aria-pressed="false">Missing</button>
+    </div>
+  </div>
+  <div class="filters">
+    <select id="rarity" aria-label="Rarity"></select>
+    <select id="domain" aria-label="Domain"></select>
+    <select id="type" aria-label="Card type"></select>
+    <select id="variant" aria-label="Version"></select>
+    <span class="count" id="count"></span>
+  </div>
+  <main class="grid" id="grid"></main>
+  <p class="empty" id="empty" hidden>No cards match these filters.</p>
+</div>
+
+<script>
+// Supabase project settings. The publishable (anon) key is meant to ship in
+// page code; the row level security in supabase.sql is what protects the data.
+const SUPABASE_URL = "https://zubiqtaihhrsywvwgnny.supabase.co";
+const SUPABASE_KEY = "sb_publishable_BVxAeMbfljbcw1oUDV6umg_YwwzskoS";
+
+const $ = (s) => document.querySelector(s);
+const RARITY = { Common: "C", Uncommon: "U", Rare: "R", Epic: "E", Showcase: "S", Promo: "P" };
+const DOMAINS = ["Fury", "Calm", "Mind", "Body", "Chaos", "Order", "Colorless"];
+const TAG = { "Alt art": "ALT", Overnumbered: "OVN", Signature: "SIG", Metal: "MTL" };
+const MAX_COPIES = 999;  // matches the check in supabase.sql
+const f = { set: "all", q: "", show: "all", rarity: "", domain: "", type: "", variant: "*" };
+let cards = [], sets = [], COLS, ROWS, user = null, flushTimer;
+
+// The device keeps the last saved counts (instant start, offline browsing) and
+// the changes not yet saved, so taps made without signal survive closing the app.
+// Counts are absolute and the last save wins: right for one person's collection,
+// but if two devices are edited offline at the same time, the later save stands.
+const local = {
+  get(k, fallback) {
+    try { return JSON.parse(localStorage.getItem(k)) ?? fallback; }
+    catch (e) { console.warn(`Ignoring unreadable ${k}:`, e); return fallback; }
+  },
+  set(k, v) {
+    try { localStorage.setItem(k, JSON.stringify(v)); return true; }
+    catch (e) { console.warn(`Couldn't keep ${k} on this device:`, e); return false; }
+  },
+};
+let saved = local.get("rb-saved", {});                                 // card id -> copies, as last read from Supabase
+const pending = new Map(Object.entries(local.get("rb-pending", {})));  // card id -> copies, not yet saved
+let owner = local.get("rb-owner", null);  // account the device copy belongs to; set once it has loaded
+
+function keep() {
+  const ok = [local.set("rb-saved", saved), local.set("rb-pending", Object.fromEntries(pending)), local.set("rb-owner", owner)].every(Boolean);
+  if (!ok) status("This device can't store your changes (storage full or private browsing). Stay online until they're saved.", true);
+  return ok;
+}
+
+const sb = SUPABASE_URL && window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+// Taps need counts this account has loaded at least once on this device;
+// counting up from an empty copy would overwrite the real numbers.
+const editable = () => !!user && owner === user.id;
+const qty = (c) => (pending.has(c.id) ? pending.get(c.id) : saved[c.id] || 0);
+const status = (msg, err = false) => { const el = $("#status"); el.textContent = msg; el.classList.toggle("err", err); };
+const fmt = (x) => x.toLocaleString();
+const shortSet = (s) => s.name.replace(/^Riftbound /, "").replace("Promotional Cards", "Promos");
+const IDLE = "Tap a card to add a copy; − removes one.";
+
+// Saves and loads run one at a time in the order asked, so a load can never
+// land between a save and the tap after it, and two loads never race.
+let chain = Promise.resolve();
+const serial = (fn) => (chain = chain.then(fn).catch((e) => status(`Something went wrong: ${e.message}`, true)));
+
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+function options(sel, any, values, labels = {}) {
+  sel.replaceChildren(new Option(any, sel.id === "variant" ? "*" : ""), ...values.map((v) => new Option(labels[v] || v, v)));
+}
+
+// Art is packed 40 to a sheet (see build.py); a card's sheet and slot follow from its index.
+const artIO = new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    if (!e.isIntersecting) continue;
+    const i = +e.target.dataset.i, per = COLS * ROWS, p = i % per;
+    e.target.style.backgroundImage = `url(sheets/${Math.floor(i / per)}.webp)`;
+    e.target.style.backgroundPosition = `${(p % COLS) / (COLS - 1) * 100}% ${Math.floor(p / COLS) / (ROWS - 1) * 100}%`;
+    artIO.unobserve(e.target);
+  }
+}, { rootMargin: "800px 0px" });
+
+function buildGrid() {
+  const setName = Object.fromEntries(sets.map((s) => [s.id, shortSet(s)]));
+  const frag = document.createDocumentFragment();
+  cards.forEach((c, i) => {
+    const card = el("div", "card");
+    const pocket = el("button", "pocket" + (c.art ? " art" : ""), c.name);
+    pocket.type = "button";
+    pocket.dataset.i = i;
+    pocket.title = `${c.name} · ${setName[c.set]} ${c.no}${c.variant ? " · " + c.variant : ""} · ${c.rarity}`;
+    const n = el("span", "n"); n.hidden = true;
+    const sub = el("button", "sub", "−"); sub.type = "button"; sub.hidden = true;
+    sub.setAttribute("aria-label", `Remove one ${c.name}`);
+    const meta = el("div", "meta", `${c.set} ${c.no}`);
+    meta.append(el("span", "", RARITY[c.rarity] || c.rarity[0]));
+    if (c.variant) { const t = el("span", "tag", TAG[c.variant] || c.variant); t.title = c.variant; meta.append(t); }
+    const dots = el("span", "dots");
+    for (const d of c.domain) { const dot = el("i"); dot.style.background = `var(--d-${d.toLowerCase()}, var(--d-colorless))`; dot.title = d; dots.append(dot); }
+    meta.append(dots);
+    card.append(pocket, n, sub, meta, el("div", "name", c.name));
+    Object.assign(c, { el: card, n, sub });
+    if (c.art) artIO.observe(pocket);
+    frag.append(card);
+  });
+  $("#grid").append(frag);
+}
+
+function paint(c) {
+  const k = qty(c);
+  c.el.classList.toggle("own", k > 0);
+  c.el.classList.toggle("playset", k >= 3);
+  c.n.hidden = k === 0;
+  c.n.textContent = k;
+  c.sub.hidden = k === 0 || !editable();
+}
+
+function renderAll() {
+  document.body.classList.toggle("ro", !editable());
+  cards.forEach(paint);
+  const own = cards.filter((c) => qty(c) > 0);
+  $("#owned").textContent = fmt(own.length);
+  $("#all").textContent = fmt(cards.length);
+  $("#copies").textContent = `${fmt(own.reduce((s, c) => s + qty(c), 0))} copies`;
+  for (const btn of $("#sets").children) {
+    const pool = btn.dataset.set === "all" ? cards : cards.filter((c) => c.set === btn.dataset.set);
+    const have = pool.filter((c) => qty(c) > 0).length;
+    btn.querySelector("small").textContent = `${fmt(have)} / ${fmt(pool.length)}`;
+    btn.querySelector(".bar i").style.width = `${(have / pool.length) * 100}%`;
+  }
+  renderCount();
+}
+
+function matches(c) {
+  if (f.set !== "all" && c.set !== f.set) return false;
+  const own = qty(c) > 0;
+  if ((f.show === "owned" && !own) || (f.show === "missing" && own)) return false;
+  if (f.rarity && c.rarity !== f.rarity) return false;
+  if (f.domain && !c.domain.includes(f.domain)) return false;
+  if (f.type && c.type !== f.type) return false;
+  if (f.variant !== "*" && c.variant !== f.variant) return false;
+  if (f.q) {
+    const hay = `${c.name} ${c.set} ${c.no} ${c.set}${c.no}`.toLowerCase();
+    if (!f.q.split(/\s+/).every((w) => hay.includes(w))) return false;
+  }
+  return true;
+}
+
+// Filters apply on filter changes only, so a card you just marked stays put
+// under "Missing" until you change the view; a mis-tap is easy to undo.
+function applyFilters() {
+  for (const c of cards) c.el.hidden = !matches(c);
+  renderCount();
+}
+
+function renderCount() {
+  const shown = cards.filter((c) => !c.el.hidden);
+  $("#count").textContent = `${fmt(shown.length)} shown · ${fmt(shown.filter((c) => qty(c) > 0).length)} owned`;
+  $("#empty").hidden = shown.length > 0;
+}
+
+function buildFilters() {
+  const setBtn = (id, label) => {
+    const b = el("button", "set");
+    b.type = "button"; b.dataset.set = id; b.setAttribute("aria-pressed", id === f.set);
+    const bar = el("span", "bar"); bar.append(el("i"));
+    b.append(el("b", "", label), el("small"), bar);
+    return b;
+  };
+  $("#sets").replaceChildren(setBtn("all", "All sets"), ...sets.map((s) => setBtn(s.id, shortSet(s))));
+  const present = (k) => [...new Set(cards.map((c) => c[k]))];
+  options($("#rarity"), "Any rarity", Object.keys(RARITY).filter((r) => present("rarity").includes(r)));
+  options($("#domain"), "Any domain", DOMAINS);
+  options($("#type"), "Any type", present("type").sort());
+  options($("#variant"), "Any version", ["", ...Object.keys(TAG)], { "": "Standard" });
+
+  $("#sets").addEventListener("click", (e) => {
+    const b = e.target.closest(".set"); if (!b) return;
+    f.set = b.dataset.set;
+    for (const x of $("#sets").children) x.setAttribute("aria-pressed", x === b);
+    applyFilters();
+  });
+  $("#show").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    f.show = b.dataset.v;
+    for (const x of $("#show").children) x.setAttribute("aria-pressed", x === b);
+    applyFilters();
+  });
+  $("#q").addEventListener("input", (e) => { f.q = e.target.value.trim().toLowerCase(); applyFilters(); });
+  for (const id of ["rarity", "domain", "type", "variant"]) {
+    $("#" + id).addEventListener("change", (e) => { f[id] = e.target.value; applyFilters(); });
+  }
+  $("#grid").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b || !editable()) return;
+    const c = cards[+b.closest(".card").querySelector(".pocket").dataset.i];
+    change(c, b.classList.contains("sub") ? -1 : 1);
+  });
+}
+
+function change(c, delta) {
+  pending.set(c.id, Math.min(MAX_COPIES, Math.max(0, qty(c) + delta)));
+  if (keep()) status("Saving…");
+  renderAll();
+  clearTimeout(flushTimer);
+  flushTimer = setTimeout(() => serial(flush), 600);  // rapid taps coalesce into one save
+}
+
+async function flush() {
+  if (!editable() || !pending.size) return;
+  const batch = new Map(pending);
+  let error;
+  try {
+    ({ error } = await sb.from("owned").upsert([...batch].map(([card_id, n]) => ({ user_id: user.id, card_id, n }))));
+  } catch (e) {
+    error = e;
+  }
+  if (error) {
+    const what = `${fmt(pending.size)} change${pending.size > 1 ? "s" : ""}`;
+    if (error.code) {  // the database refused the request; sending it again can't succeed
+      status(`${what} refused by the database (${error.message}). They're kept on this device.`, true);
+    } else {           // no connection: try again later, and on reconnect or reopening the app
+      status(`${what} not saved yet: no connection. They're kept on this device and save once you're back online.`, true);
+      clearTimeout(flushTimer);
+      flushTimer = setTimeout(() => serial(flush), 15000);
+    }
+    return;
+  }
+  for (const [id, n] of batch) {
+    if (n > 0) saved[id] = n; else delete saved[id];
+    if (pending.get(id) === n) pending.delete(id);  // a tap made during the save stays pending
+  }
+  keep();
+  if (!pending.size) status("All changes saved");
+}
+
+async function load() {
+  if (!user) return;
+  const rows = [];
+  // Keyset paging: the API caps a response at 1000 rows, and offset paging
+  // would skip a row whenever another device zeroed one mid-read.
+  for (let last = ""; ;) {
+    const { data, error } = await sb.from("owned").select("card_id,n").gt("n", 0).gt("card_id", last).order("card_id").limit(1000);
+    if (error) {
+      const why = error.code ? error.message : "no connection";
+      status(`Couldn't load your saved collection (${why}). ${editable() ? "Showing the copy kept on this device." : "Changes are off until it loads."}`, true);
+      return;
+    }
+    rows.push(...data);
+    if (data.length < 1000) break;
+    last = data[data.length - 1].card_id;
+  }
+  saved = Object.fromEntries(rows.map((r) => [r.card_id, r.n]));
+  owner = user.id;
+  keep();
+  renderAll();
+  status(pending.size ? "Saving…" : IDLE);
+  if (pending.size) serial(flush);
+}
+
+function onSession(session) {
+  const before = user?.id;
+  user = session?.user || null;
+  if (user && owner && owner !== user.id) {  // another account: this device's copy isn't theirs
+    saved = {}; pending.clear(); owner = null; keep();
+  }
+  $("#login").hidden = !!user;
+  $("#who").hidden = !user;
+  $("#who-email").textContent = user?.email || "";
+  renderAll();
+  if (!user) status("Sign in to change your collection.");
+  else if (user.id !== before) { status("Loading your collection…"); serial(flush); serial(load); }
+}
+
+function connect() {
+  if (!sb) {
+    status("Sync isn't set up: add your Supabase URL and key at the top of the page's script.", true);
+    return;
+  }
+  // Supabase calls must not run inside the auth callback itself, hence the timeout.
+  sb.auth.onAuthStateChange((_event, session) => setTimeout(() => onSession(session), 0));
+  $("#login").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    status("Signing in…");
+    const { error } = await sb.auth.signInWithPassword({ email: $("#email").value.trim(), password: $("#password").value });
+    if (error) status(`Couldn't sign in: ${error.message}`, true);
+    else $("#password").value = "";
+  });
+  $("#signout").addEventListener("click", async () => {
+    await serial(flush);
+    if (pending.size) { status("Some changes aren't saved yet. Sign out once you have a connection.", true); return; }
+    const { error } = await sb.auth.signOut();
+    if (error) { status(`Couldn't sign out: ${error.message}`, true); return; }
+    saved = {}; owner = null; keep(); renderAll();
+  });
+  window.addEventListener("online", () => serial(flush));
+  document.addEventListener("visibilitychange", () => {
+    if (!user) return;
+    if (document.visibilityState === "hidden") { clearTimeout(flushTimer); serial(flush); }
+    else { serial(flush); serial(load); }  // back in the app: send what's queued, then pick up other devices' changes
+  });
+}
+
+async function boot() {
+  try {
+    const res = await fetch("cards.json");
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    ({ cards, sets } = data);
+    [, , COLS, ROWS] = data.tile;
+  } catch (e) {
+    status(`Couldn't load the card list (${e.message}). Reload the page to try again.`, true);
+    return;
+  }
+  buildFilters();
+  buildGrid();
+  renderAll();
+  applyFilters();
+  connect();
+}
+boot();
+</script>
+</body>
+</html>
