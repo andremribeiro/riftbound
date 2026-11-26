@@ -26,7 +26,7 @@ function legalDeck() {
     while (!cards.length) await sleep(100);  // cards.json is real I/O, not virtual time
     await sleep(300);
     const c = byId["ogn-001-298"], add = c.t.add;
-    const server = () => __db.find((r) => r.card_id === c.id)?.n;
+    const server = () => __db.find((r) => r.card_id === c.id && r.user_id === "u1")?.n;
     const queued = () => JSON.parse(localStorage.getItem("rb-pending") || "{}");
     const removeOne = () => { c.t.tile.querySelector(".art").click(); $("#card-body .stepper button").click(); $("#card").close(); };
 
@@ -143,6 +143,39 @@ function legalDeck() {
       window.confirm = () => true;
       $("#delete-deck").click(); await sleep(1000);
       ok("deleting a deck removes it", !__decks.some((x) => x.id === id) && location.hash === "#decks" && !deckOf(id));
+
+      // Friends and trades
+      location.hash = "friends"; await sleep(300);
+      ok("the Friends tab asks for a display name first", !!$("#my-name") && !social.me);
+      $("#my-name").value = "Ana"; $("#my-name").dispatchEvent(new Event("input")); $("#my-name").form.requestSubmit(); await sleep(400);
+      ok("saving a name shows a friend code", social.me?.code === "ANA45678" && $("#friends-body").textContent.includes("ANA45678"));
+      $("#add-code").value = "bruno123 "; $("#add-code").form.requestSubmit(); await sleep(400);
+      ok("a friend code sends a request", __friendships.some((f) => f.requester === "u1" && f.addressee === "u2" && !f.accepted)
+        && $("#status").textContent.includes("Bruno"));
+      __friendships[0].accepted = true;  // Bruno accepts
+      await serial(loadSocial);
+      ok("an accepted friend is listed with a link to their collection", !!document.querySelector('#friends-body a[href="#friend-u2"]'));
+      location.hash = "friend-u2"; await sleep(500);
+      ok("a friend's collection lists the cards they have that you're missing",
+        $("#friend-grid").children.length === 2 && $("#friend-summary").textContent.startsWith("Bruno owns 2 of"));
+      $("#friend-grid .add").click(); $("#friend-grid .add").click(); $("#friend-grid .add").click(); await sleep(50);
+      ok("asking for a card is capped at how many they have", offer.get.get("ogn-002-298") === 2 && !$("#tradebar").hidden);
+      document.querySelector('#friend-modes [data-mode="mine"]').click(); await sleep(50);
+      document.querySelector(`#friend-grid .add[data-id="${c.id}"]`).click(); await sleep(50);
+      ok("your cards they're missing can go in the offer", offer.give.get(c.id) === 1 && $("#tradebar-text").textContent === "You get 2, give 1");
+      $("#tradebar-review").click(); await sleep(50);
+      $("#offer-note").value = "deal?"; $("#offer-note").dispatchEvent(new Event("input"));
+      $("#offer-send").click(); await sleep(400);
+      const sentTrade = __trades.find((t) => t.from_user === "u1");
+      ok("sending an offer saves both sides and clears the tray", !!sentTrade && sentTrade.get["ogn-002-298"] === 2 && sentTrade.give[c.id] === 1
+        && sentTrade.note === "deal?" && sentTrade.to_user === "u2" && $("#tradebar").hidden && !$("#offer").open);
+      __trades.push({ id: "t-in", from_user: "u2", to_user: "u1", give: { "ogn-003-298": 1 }, get: {}, note: null, status: "open", created_at: new Date().toISOString() });
+      location.hash = "friends"; await sleep(100); await serial(loadSocial); await sleep(100);
+      ok("an offer for you shows a count on the Friends tab", document.querySelector("[data-tab=friends] .badge").textContent === "1");
+      const loadsBefore = __loads;
+      [...document.querySelectorAll("#friends-body button")].find((b) => b.textContent === "Accept").click(); await sleep(800);
+      ok("accepting asks the database to do the trade, then reloads your cards",
+        __rpc.some((r) => r.name === "answer_trade" && r.args.trade_id === "t-in" && r.args.answer === "accepted") && __loads > loadsBefore);
 
       location.hash = "%E0%A4%A"; await sleep(50);
       ok("a malformed address opens the collection instead of breaking the page", !$("#view-collection").hidden);

@@ -1,4 +1,5 @@
--- Run once in the Supabase SQL editor. One row per card you own, per account.
+-- Run once in the Supabase SQL editor, then supabase-friends.sql.
+-- One row per card you own, per account.
 create table public.owned (
   user_id uuid not null default auth.uid() references auth.users on delete cascade,
   card_id text not null,

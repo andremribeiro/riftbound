@@ -232,6 +232,45 @@ dialog.sheet::backdrop { background: rgb(8 10 14 / .5); }
 .line .need { font-size: 12px; color: var(--warn); white-space: nowrap; }
 .line .step { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); cursor: pointer; line-height: 1; padding: 0; }
 .ro .line .step { visibility: hidden; }
+
+/* Friends and trades */
+.panels { display: grid; gap: 16px; max-width: 760px; }
+.panel { display: grid; gap: 12px; padding: 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); }
+.panel h2 { font-size: 17px; }
+.panel p { margin: 0; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.row .field { flex: 1 1 200px; }
+.field { font: inherit; font-size: 16px; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 9px 16px; min-width: 0; }
+textarea.field { border-radius: 12px; min-height: 72px; resize: vertical; }
+.code { font-size: 18px; letter-spacing: .08em; font-variant-numeric: tabular-nums; }
+.people { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.person { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-block: 4px; }
+.person > :first-child { flex: 1 1 auto; min-width: 0; font-weight: 600; }
+.person a { text-decoration: none; }
+.trade { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+.trade:first-of-type { border-top: 0; padding-top: 0; }
+.trade-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 560px) { .trade-sides { grid-template-columns: minmax(0, 1fr); } }
+.trade-side h3 { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.trade-line { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 14px; padding-block: 2px; }
+.trade-line .nm { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.offer-line { display: grid; grid-template-columns: minmax(0, 1fr) auto 28px 22px 28px; gap: 8px; align-items: center; font-size: 14px; padding-block: 3px; }
+.offer-line .step { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); cursor: pointer; padding: 0; }
+.offer-line .n { text-align: center; font-weight: 650; font-variant-numeric: tabular-nums; }
+.add.picked { background: var(--primary); color: var(--on-primary); font-size: 16px; font-weight: 700; }
+.tabs a .badge, .tabbar a .badge { display: inline-block; margin-left: 6px; }
+.tradebar {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 24;
+  display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 18px; border-radius: 999px; max-width: calc(100vw - 32px);
+  background: var(--primary); color: var(--on-primary); box-shadow: 0 8px 24px rgb(0 0 0 / .3); font-weight: 550; white-space: nowrap;
+}
+.tradebar span { overflow: hidden; text-overflow: ellipsis; }
+.tradebar .btn { border: 0; background: var(--on-primary); color: var(--primary); }
+.tradebar .btn.quiet { background: transparent; color: var(--on-primary); }
+@media (max-width: 720px) {
+  .tradebar { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); transform: none; max-width: none; }
+  .tradebar span { flex: 1; }
+}
 </style>
 </head>
 <body class="ro">
@@ -241,6 +280,7 @@ dialog.sheet::backdrop { background: rgb(8 10 14 / .5); }
     <nav class="tabs" aria-label="Sections">
       <a href="#collection" data-tab="collection">Collection</a>
       <a href="#decks" data-tab="decks">Decks</a>
+      <a href="#friends" data-tab="friends">Friends<span class="badge" hidden></span></a>
     </nav>
     <div class="account" id="who" hidden><span id="who-email"></span><button type="button" class="link" id="signout">Sign out</button></div>
   </div>
@@ -291,6 +331,29 @@ dialog.sheet::backdrop { background: rgb(8 10 14 / .5); }
     <p class="empty" id="no-decks" hidden>No decks yet. Start one with New deck and pick a legend.</p>
   </section>
 
+  <section id="view-friends" hidden>
+    <div class="head"><h1>Friends</h1></div>
+    <div class="panels" id="friends-body"></div>
+  </section>
+
+  <section id="view-friend" hidden>
+    <div class="deck-head"><a class="btn quiet" href="#friends">Back to friends</a></div>
+    <div class="head">
+      <div>
+        <h1 id="friend-title">Collection</h1>
+        <p class="summary" id="friend-summary"></p>
+      </div>
+    </div>
+    <div class="chips" id="friend-modes">
+      <button type="button" class="chip" data-mode="theirs">Their cards</button>
+      <button type="button" class="chip" data-mode="mine">My cards</button>
+      <button type="button" class="chip" id="friend-only"></button>
+    </div>
+    <div class="toolbar"><input type="search" id="friend-q" placeholder="Search by name or number" aria-label="Search these cards"></div>
+    <p class="count" id="friend-count"></p>
+    <div class="grid" id="friend-grid"></div>
+  </section>
+
   <section id="view-deck" hidden>
     <div class="deck-head">
       <a class="btn quiet" href="#decks">Back to decks</a>
@@ -321,7 +384,16 @@ dialog.sheet::backdrop { background: rgb(8 10 14 / .5); }
 <nav class="tabbar" aria-label="Sections">
   <a href="#collection" data-tab="collection">Collection</a>
   <a href="#decks" data-tab="decks">Decks</a>
+  <a href="#friends" data-tab="friends">Friends<span class="badge" hidden></span></a>
 </nav>
+
+<div class="tradebar" id="tradebar" hidden>
+  <span id="tradebar-text"></span>
+  <button type="button" class="btn quiet" id="tradebar-clear">Clear</button>
+  <button type="button" class="btn" id="tradebar-review">Review offer</button>
+</div>
+
+<dialog class="sheet" id="offer" aria-label="Trade offer"><div class="sheet-in" id="offer-body"></div></dialog>
 
 <dialog class="sheet" id="filters" aria-label="Filters">
   <div class="sheet-in">
@@ -949,18 +1021,333 @@ function buildDecks() {
   });
 }
 
+/* ---------- Friends and trades ---------- */
+
+// Online only: unlike counts and decks, these aren't queued on the device.
+const social = { loaded: false, error: null, me: null, friends: [], names: {}, trades: [], pendingAdd: "", nameDraft: null };
+const friend = { id: null, cards: {}, loaded: false, error: null, mode: "theirs", onlyNew: true, q: "", key: "", tiles: new Map() };
+const offer = { to: null, get: new Map(), give: new Map(), note: "" };
+const nameOf = (id) => social.names[id] || "A former friend";
+const sumOf = (m) => [...m.values()].reduce((s, n) => s + n, 0);
+const valueOf = (items) => Object.entries(items).reduce((s, [id, n]) => s + n * (prices[id] || 0), 0);
+const isFriend = (id) => social.friends.some((f) => f.id === id && f.accepted);
+const waitingForMe = () => social.friends.filter((f) => !f.accepted && f.incoming).length
+  + social.trades.filter((t) => t.status === "open" && t.to_user === user?.id).length;
+
+async function loadSocial() {
+  if (!user || !sb) return;
+  const [p, f, t] = await Promise.all([
+    sb.from("profiles").select("id,name,code").eq("id", user.id).maybeSingle(),
+    sb.from("friendships").select("requester,addressee,accepted"),
+    sb.from("trades").select("id,from_user,to_user,give,get,note,status,created_at").order("created_at", { ascending: false }).limit(100),
+  ]);
+  const error = p.error || f.error || t.error;
+  if (error) { social.error = error.code ? error.message : "no connection"; return renderAll(); }
+  const friends = f.data.map((r) => ({ id: r.requester === user.id ? r.addressee : r.requester, accepted: r.accepted, incoming: r.addressee === user.id }));
+  const ids = [...new Set([...friends.map((x) => x.id), ...t.data.flatMap((x) => [x.from_user, x.to_user])])].filter((x) => x !== user.id);
+  const names = ids.length ? await sb.from("profiles").select("id,name").in("id", ids) : { data: [] };
+  Object.assign(social, { loaded: true, error: null, me: p.data, friends, trades: t.data,
+    names: Object.fromEntries((names.data || []).map((x) => [x.id, x.name])) });
+  renderAll();
+}
+
+// One friends or trades call: says what happened, then reloads the friends data.
+async function act(call, done) {
+  if (!editable()) return false;
+  try {
+    const { data, error } = await call();
+    if (error) { status(error.message, true); return false; }
+    if (done) status(typeof done === "function" ? done(data) : done);
+  } catch (e) {
+    status(`Couldn't reach the server (${e.message}). Try again when you're online.`, true);
+    return false;
+  }
+  await serial(loadSocial);
+  return true;
+}
+
+function button(label, onclick, cls = "btn") {
+  const b = el("button", cls, label);
+  b.type = "button"; b.onclick = onclick; b.disabled = !editable();
+  return b;
+}
+
+function panel(title, ...children) {
+  const sec = el("section", "panel");
+  sec.append(el("h2", "", title), ...children);
+  return sec;
+}
+
+function renderFriends() {
+  const box = $("#friends-body");
+  if (!user) return box.replaceChildren(el("p", "muted", "Sign in to add friends and trade cards."));
+  if (!social.loaded) return box.replaceChildren(el("p", social.error ? "bad" : "muted", social.error ? `Friends couldn't load (${social.error}).` : "Loading friends…"));
+  const parts = [];
+
+  const nameForm = el("form", "row");
+  const nameIn = el("input", "field"); nameIn.id = "my-name"; nameIn.maxLength = 40; nameIn.required = true;
+  nameIn.placeholder = "Your name"; nameIn.value = social.nameDraft ?? social.me?.name ?? ""; nameIn.setAttribute("aria-label", "Your name, as friends see it");
+  nameIn.oninput = () => { social.nameDraft = nameIn.value; };  // the panel is rebuilt on refresh; keep what's typed
+  const nameGo = el("button", "btn", social.me ? "Save name" : "Save"); nameGo.type = "submit";
+  nameForm.append(nameIn, nameGo);
+  nameForm.onsubmit = (e) => {
+    e.preventDefault();
+    const name = nameIn.value.trim();
+    act(() => social.me ? sb.from("profiles").update({ name }).eq("id", user.id) : sb.from("profiles").insert({ name }), "Name saved.")
+      .then((saved) => { if (saved) social.nameDraft = null; });
+  };
+  if (!social.me) {
+    box.replaceChildren(panel("Choose the name your friends will see", el("p", "muted", "You'll get a friend code to share once it's saved."), nameForm));
+    return;
+  }
+
+  const link = `${location.origin}${location.pathname}#add-${social.me.code}`;
+  const codeLine = el("p"); codeLine.append("Your friend code is ", el("strong", "code", social.me.code), ".");
+  const share = button("Share invite link", async () => {
+    try {
+      if (navigator.share) await navigator.share({ title: "Riftbound", text: "Add me as a friend on Riftbound", url: link });
+      else { await navigator.clipboard.writeText(link); status("Invite link copied."); }
+    } catch (e) {
+      if (e.name !== "AbortError") status(`Couldn't share it; send this link instead: ${link}`);
+    }
+  }, "btn primary");
+  share.disabled = false;
+  parts.push(panel("You", nameForm, codeLine, share));
+
+  const addForm = el("form", "row");
+  const codeIn = el("input", "field"); codeIn.id = "add-code"; codeIn.maxLength = 12; codeIn.required = true;
+  codeIn.placeholder = "Friend code"; codeIn.value = social.pendingAdd; codeIn.setAttribute("aria-label", "Friend code");
+  codeIn.oninput = () => { social.pendingAdd = codeIn.value; };
+  const codeGo = el("button", "btn", "Send request"); codeGo.type = "submit"; codeGo.disabled = !editable();
+  addForm.append(codeIn, codeGo);
+  addForm.onsubmit = async (e) => {
+    e.preventDefault();
+    if (await act(() => sb.rpc("send_friend_request", { friend_code: codeIn.value }), (name) => `Friend request sent to ${name}.`)) social.pendingAdd = "";
+  };
+  parts.push(panel("Add a friend", addForm));
+
+  const unfriend = (id) => sb.from("friendships").delete().in("requester", [id, user.id]).in("addressee", [id, user.id]);
+  const people = (list, actions) => {
+    const ul = el("ul", "people");
+    for (const f of list) { const li = el("li", "person"); li.append(...actions(f)); ul.append(li); }
+    return ul;
+  };
+  const incoming = social.friends.filter((f) => !f.accepted && f.incoming);
+  const sent = social.friends.filter((f) => !f.accepted && !f.incoming);
+  const friends = social.friends.filter((f) => f.accepted).sort((a, b) => nameOf(a.id).localeCompare(nameOf(b.id)));
+  if (incoming.length) parts.push(panel("Friend requests", people(incoming, (f) => [el("span", "", nameOf(f.id)),
+    button("Accept", () => act(() => sb.from("friendships").update({ accepted: true }).eq("requester", f.id).eq("addressee", user.id), `You and ${nameOf(f.id)} are now friends.`), "btn primary"),
+    button("Decline", () => act(() => unfriend(f.id), "Request declined."))])));
+
+  const openIn = social.trades.filter((t) => t.status === "open" && t.to_user === user.id);
+  if (openIn.length) parts.push(panel("Offers for you", ...openIn.map((t) => tradeCard(t, [
+    button("Accept", () => answerTrade(t, "accepted"), "btn primary"), button("Decline", () => answerTrade(t, "declined"))]))));
+
+  parts.push(panel("Friends", friends.length ? people(friends, (f) => {
+    const a = el("a", "", nameOf(f.id)); a.href = `#friend-${f.id}`;
+    const see = el("a", "btn", "See collection"); see.href = `#friend-${f.id}`;
+    return [a, see, button("Remove", () => confirm(`Remove ${nameOf(f.id)} from your friends?`) && act(() => unfriend(f.id), "Friend removed."), "btn quiet")];
+  }) : el("p", "muted", "No friends yet. Share your invite link, or add a friend's code above.")));
+
+  if (sent.length) parts.push(panel("Waiting for an answer", people(sent, (f) => [el("span", "", nameOf(f.id)),
+    button("Cancel request", () => act(() => unfriend(f.id), "Request cancelled."), "btn quiet")])));
+  const openOut = social.trades.filter((t) => t.status === "open" && t.from_user === user.id);
+  if (openOut.length) parts.push(panel("Your offers", ...openOut.map((t) => tradeCard(t, [button("Cancel offer", () => answerTrade(t, "cancelled"), "btn quiet")]))));
+  const past = social.trades.filter((t) => t.status !== "open").slice(0, 10);
+  if (past.length) parts.push(panel("Past trades", ...past.map((t) => tradeCard(t))));
+  box.replaceChildren(...parts);
+}
+
+function tradeList(label, items) {
+  const side = el("div", "trade-side");
+  const worth = valueOf(items);
+  side.append(el("h3", "", worth ? `${label}, about ${euro(worth)}` : label));
+  const ul = el("ul", "lines");
+  const entries = Object.entries(items || {});
+  if (!entries.length) ul.append(el("li", "muted", "Nothing"));
+  for (const [id, n] of entries) {
+    const c = byId[id], li = el("li", "trade-line");
+    const nm = el("button", "nm", c ? plainName(c) : id); nm.type = "button";
+    if (c) nm.onclick = () => openCard(c);
+    li.append(el("span", "num", `${n}×`), nm, el("span", "muted", c ? `${c.set} ${c.no}` : ""));
+    ul.append(li);
+  }
+  side.append(ul);
+  return side;
+}
+
+function tradeCard(t, actions = []) {
+  const mine = t.from_user === user.id, other = nameOf(mine ? t.to_user : t.from_user);
+  const card = el("div", "trade");
+  const when = new Date(t.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  card.append(el("p", "", mine ? `You offered ${other} a trade on ${when}.` : `${other} offered you a trade on ${when}.`));
+  const sides = el("div", "trade-sides");
+  sides.append(tradeList("You get", mine ? t.get : t.give), tradeList("You give", mine ? t.give : t.get));
+  card.append(sides);
+  if (t.note) card.append(el("p", "muted", `Note: ${t.note}`));
+  if (t.status !== "open") card.append(el("p", t.status === "accepted" ? "ok" : "muted", { accepted: "Accepted", declined: "Declined", cancelled: "Cancelled" }[t.status]));
+  if (actions.length) { const row = el("div", "row"); row.append(...actions); card.append(row); }
+  return card;
+}
+
+async function answerTrade(t, answer) {
+  if (!editable()) return;
+  await serial(flush);  // queued changes first, so the trade checks and moves the real counts
+  if (pending.size) return status("Some changes aren't saved yet. Answer the offer once they are.", true);
+  const done = { accepted: "Trade done: both collections are updated.", declined: "Offer declined.", cancelled: "Offer cancelled." }[answer];
+  if (await act(() => sb.rpc("answer_trade", { trade_id: t.id, answer }), done) && answer === "accepted") serial(load);
+}
+
+async function openFriend(id) {
+  if (friend.id !== id) {
+    Object.assign(friend, { id, cards: {}, loaded: false, error: null, key: "", q: "" });
+    Object.assign(offer, { to: id, note: "" }); offer.get.clear(); offer.give.clear();
+    $("#friend-q").value = "";
+  }
+  friend.loaded = false;  // always fresh: their collection may have changed
+  renderFriend();
+  if (!user || !sb) return;
+  try { friend.cards = await fetchOwned(id); friend.loaded = true; friend.error = null; }
+  catch (e) { friend.error = e.code ? e.message : "no connection"; }
+  renderFriend();
+}
+
+function renderFriend() {
+  const id = friend.id, name = nameOf(id);
+  $("#friend-title").textContent = social.loaded ? `${name}'s collection` : "Collection";
+  const theirs = (c) => friend.cards[c.id] || 0;
+  let note = "";
+  if (!social.loaded) note = "Loading…";
+  else if (!isFriend(id)) note = "You're not friends with this person, so their collection is private.";
+  else if (friend.error) note = `Their collection couldn't load (${friend.error}).`;
+  else if (!friend.loaded) note = "Loading their collection…";
+  const ready = !note;
+  if (ready) {
+    const owned = cards.filter((c) => theirs(c) > 0);
+    const worth = owned.reduce((s, c) => s + theirs(c) * (prices[c.id] || 0), 0);
+    note = `${name} owns ${fmt(owned.length)} of ${fmt(cards.length)} cards${worth ? `, worth about ${euro(worth)}` : ""}.`;
+  }
+  $("#friend-summary").textContent = note;
+  for (const b of $("#friend-modes").querySelectorAll("[data-mode]")) b.setAttribute("aria-pressed", b.dataset.mode === friend.mode);
+  $("#friend-only").textContent = friend.mode === "theirs" ? "Only ones I'm missing" : "Only ones they're missing";
+  $("#friend-only").setAttribute("aria-pressed", friend.onlyNew);
+
+  // The grid is rebuilt only when what it lists changes; taps just repaint counts.
+  const key = [id, ready, friend.mode, friend.onlyNew, friend.q].join("|");
+  if (key !== friend.key) {
+    friend.key = key; friend.tiles.clear();
+    const list = !ready ? [] : cards.filter((c) => (friend.mode === "theirs"
+      ? theirs(c) > 0 && (!friend.onlyNew || qty(c) === 0)
+      : qty(c) > 0 && (!friend.onlyNew || theirs(c) === 0))
+      && (!friend.q || hasWords(`${c.name} ${c.set} ${c.no} ${c.set}${c.no}`.toLowerCase(), friend.q)));
+    const frag = document.createDocumentFragment();
+    for (const c of list) {
+      const t = makeTile(c);
+      t.add.setAttribute("aria-label", friend.mode === "theirs" ? `Ask for ${plainName(c)}` : `Offer ${plainName(c)}`);
+      friend.tiles.set(c.id, t);
+      frag.append(t.tile);
+    }
+    $("#friend-grid").replaceChildren(frag);
+    $("#friend-count").textContent = ready ? `${fmt(list.length)} cards shown` : "";
+  }
+  for (const [cid, t] of friend.tiles) {
+    const c = byId[cid], have = friend.mode === "theirs" ? theirs(c) : qty(c);
+    const picked = (friend.mode === "theirs" ? offer.get : offer.give).get(cid) || 0;
+    t.qty.hidden = !have; t.qty.textContent = have;
+    t.add.textContent = picked || "+";
+    t.add.classList.toggle("picked", picked > 0);
+  }
+  renderTradeBar();
+}
+
+function renderTradeBar() {
+  const show = !$("#view-friend").hidden && editable() && offer.to === friend.id && (offer.get.size + offer.give.size) > 0;
+  $("#tradebar").hidden = !show;
+  if (show) $("#tradebar-text").textContent = `You get ${sumOf(offer.get)}, give ${sumOf(offer.give)}`;
+}
+
+function changeOffer(side, c, delta) {
+  const max = side === offer.get ? friend.cards[c.id] || 0 : qty(c);
+  const before = side.get(c.id) || 0, n = Math.min(max, Math.max(0, before + delta));
+  if (n) side.set(c.id, n); else side.delete(c.id);
+  if (delta > 0 && n === before) status(`That's all ${side === offer.get ? `${nameOf(friend.id)} has` : "you have"} of ${plainName(c)}.`);
+  renderFriend();
+  if ($("#offer").open) renderOffer();
+}
+
+function renderOffer() {
+  const name = nameOf(offer.to);
+  const head = el("div", "sheet-head");
+  const close = el("button", "close", "×"); close.type = "button"; close.dataset.close = ""; close.setAttribute("aria-label", "Close");
+  head.append(el("h2", "", `Offer to ${name}`), close);
+  const side = (label, map) => {
+    const box = el("div", "trade-side");
+    const worth = valueOf(Object.fromEntries(map));
+    box.append(el("h3", "", worth ? `${label}, about ${euro(worth)}` : label));
+    if (!map.size) box.append(el("p", "muted", label === "You get" ? "Nothing yet: add cards from their collection." : "Nothing yet: add cards from My cards."));
+    for (const [id, n] of map) {
+      const c = byId[id], line = el("div", "offer-line");
+      const minus = el("button", "step", "−"), plus = el("button", "step", "+");
+      minus.type = plus.type = "button";
+      minus.setAttribute("aria-label", `One fewer ${plainName(c)}`); plus.setAttribute("aria-label", `One more ${plainName(c)}`);
+      minus.onclick = () => changeOffer(map, c, -1); plus.onclick = () => changeOffer(map, c, 1);
+      line.append(el("span", "", `${plainName(c)} (${c.set} ${c.no})`), el("span", "muted", euro(prices[id])), minus, el("span", "n", n), plus);
+      box.append(line);
+    }
+    return box;
+  };
+  const note = el("textarea", "field"); note.id = "offer-note"; note.maxLength = 280; note.value = offer.note;
+  note.placeholder = "Add a note (optional)"; note.setAttribute("aria-label", "Note for your friend");
+  note.oninput = () => { offer.note = note.value; };
+  const send = el("button", "btn primary", "Send offer"); send.type = "button"; send.id = "offer-send";
+  send.disabled = !editable() || !(offer.get.size + offer.give.size);
+  send.onclick = async () => {
+    send.disabled = true;
+    const sent = await act(() => sb.from("trades").insert({ to_user: offer.to, give: Object.fromEntries(offer.give), get: Object.fromEntries(offer.get), note: offer.note.trim() || null }),
+      `Offer sent to ${name}.`);
+    if (sent) { offer.get.clear(); offer.give.clear(); offer.note = ""; $("#offer").close(); renderFriend(); } else send.disabled = false;
+  };
+  const sides = el("div", "trade-sides"); sides.append(side("You get", offer.get), side("You give", offer.give));
+  const foot = el("div", "sheet-foot"); foot.append(el("span"), send);
+  $("#offer-body").replaceChildren(head, sides, note, foot);
+}
+
+function buildFriends() {
+  $("#friend-modes").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    if (b.id === "friend-only") friend.onlyNew = !friend.onlyNew; else friend.mode = b.dataset.mode;
+    renderFriend();
+  });
+  $("#friend-q").addEventListener("input", (e) => { friend.q = e.target.value.trim().toLowerCase(); renderFriend(); });
+  $("#friend-grid").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    const c = byId[b.dataset.id];
+    if (!b.classList.contains("add")) return openCard(c);
+    if (editable()) changeOffer(friend.mode === "theirs" ? offer.get : offer.give, c, 1);
+  });
+  $("#tradebar-clear").addEventListener("click", () => { offer.get.clear(); offer.give.clear(); renderFriend(); });
+  $("#tradebar-review").addEventListener("click", () => { renderOffer(); $("#offer").showModal(); });
+}
+
 /* ---------- Views ---------- */
 
 function route() {
   let h = "";
   try { h = decodeURIComponent(location.hash.slice(1)); } catch (e) { console.warn("Ignoring a malformed address:", e); }
+  if (h.startsWith("add-")) {  // an invite link: fill in the code on the Friends tab
+    social.pendingAdd = h.slice(4).toUpperCase();
+    return location.replace("#friends");
+  }
   ui.deck = h.startsWith("deck-") ? h.slice(5) : null;
-  const view = ui.deck ? "deck" : h === "decks" ? "decks" : "collection";
-  for (const v of ["collection", "decks", "deck"]) $(`#view-${v}`).hidden = v !== view;
+  const friendId = h.startsWith("friend-") ? h.slice(7) : null;
+  const view = ui.deck ? "deck" : friendId ? "friend" : ["decks", "friends"].includes(h) ? h : "collection";
+  for (const v of ["collection", "decks", "deck", "friends", "friend"]) $(`#view-${v}`).hidden = v !== view;
+  const tab = { deck: "decks", friend: "friends" }[view] || view;
   for (const a of document.querySelectorAll("[data-tab]")) {
-    if (a.dataset.tab === (view === "deck" ? "decks" : view)) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    if (a.dataset.tab === tab) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   }
   if (view === "deck") { pool = null; $("#pool-q").value = ""; ui.poolQ = ""; ui.poolType = ""; }
+  if (view === "friend") openFriend(friendId);
   renderAll();
   window.scrollTo(0, 0);
 }
@@ -969,6 +1356,11 @@ function renderAll() {
   renderCollection();
   if (!$("#view-decks").hidden) renderDecks();
   if (!$("#view-deck").hidden) renderEditor();
+  if (!$("#view-friends").hidden) renderFriends();
+  if (!$("#view-friend").hidden) renderFriend();
+  renderTradeBar();
+  const waiting = user ? waitingForMe() : 0;  // requests and offers that need your answer
+  for (const b of document.querySelectorAll("[data-tab=friends] .badge")) { b.hidden = !waiting; b.textContent = waiting; }
   if ($("#card").open) renderCard();
 }
 
@@ -1015,23 +1407,29 @@ async function flush() {
   if (!pending.size && !pendingDecks.size) status(IDLE);
 }
 
-async function load() {
-  if (!user) return;
-  const rows = [];
-  // Keyset paging: the API caps a response at 1000 rows, and offset paging
-  // would skip a row whenever another device zeroed one mid-read.
+// Every card one account owns. Friends can read each other's rows, so the
+// account is always named. Keyset paging: the API caps a response at 1000
+// rows, and offset paging would skip a row if another device zeroed one mid-read.
+async function fetchOwned(uid) {
+  const rows = {};
   for (let last = ""; ;) {
-    const { data, error } = await sb.from("owned").select("card_id,n").gt("n", 0).gt("card_id", last).order("card_id").limit(1000);
-    if (error) return loadFailed(error);
-    rows.push(...data);
-    if (data.length < 1000) break;
+    const { data, error } = await sb.from("owned").select("card_id,n").eq("user_id", uid).gt("n", 0).gt("card_id", last).order("card_id").limit(1000);
+    if (error) throw error;
+    for (const r of data) rows[r.card_id] = r.n;
+    if (data.length < 1000) return rows;
     last = data[data.length - 1].card_id;
   }
+}
+
+async function load() {
+  if (!user) return;
+  let owned;
+  try { owned = await fetchOwned(user.id); } catch (error) { return loadFailed(error); }
   // Decks are a separate table: if they can't load (say the decks part of
   // supabase.sql was never run), the collection must still work.
   const { data: decks, error } = await sb.from("decks").select("id,name,legend,champion,cards,updated_at").limit(1000);
   decksError = error ? (error.code ? error.message : "no connection") : null;
-  saved = Object.fromEntries(rows.map((r) => [r.card_id, r.n]));
+  saved = owned;
   if (!error) savedDecks = Object.fromEntries(decks.map((d) => [d.id, d]));
   owner = user.id;
   loadedOnce = true;
@@ -1061,7 +1459,8 @@ function onSession(session) {
   $("#who-email").textContent = user?.email || "";
   renderAll();
   if (!user) status("");
-  else if (user.id !== before) { status("Loading your collection…"); serial(flush); serial(load); }
+  else if (user.id !== before) { status("Loading your collection…"); serial(flush); serial(load); serial(loadSocial); }
+  if (!user) Object.assign(social, { loaded: false, error: null, me: null, friends: [], names: {}, trades: [] });
 }
 
 let loginMode = "signin";
@@ -1149,7 +1548,7 @@ function connect() {
   document.addEventListener("visibilitychange", () => {
     if (!user) return;
     if (document.visibilityState === "hidden") { clearTimeout(flushTimer); serial(flush); }
-    else { serial(flush); serial(load); }  // back in the app: send what's queued, then pick up other devices' changes
+    else { serial(flush); serial(load); serial(loadSocial); }  // back in the app: send what's queued, then pick up changes made elsewhere
   });
 }
 
@@ -1187,6 +1586,7 @@ async function boot() {
   }
   buildCollection();
   buildDecks();
+  buildFriends();
   applyFilters();
   window.addEventListener("hashchange", route);
   route();

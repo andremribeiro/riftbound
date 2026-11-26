@@ -5,6 +5,8 @@
 set -u
 here=$(cd "$(dirname "$0")" && pwd); site="$here/../docs"; tmp=$(mktemp -d); port=8766
 python3 -I "$here/test_prices.py" || exit 1
+# The access rules and trade function, on a throwaway local Postgres (pgserver needs Python <= 3.12).
+uv run -q --python 3.12 --with pgserver --with "psycopg[binary]" python -I "$here/test_sql.py" || exit 1
 trap 'kill "$srv" 2>/dev/null; rm -rf "$tmp"' EXIT
 ln -s "$site/cards.json" "$tmp/cards.json"; ln -s "$site/sheets" "$tmp/sheets"; ln -s "$site/prices.json" "$tmp/prices.json"
 cp "$here/fake-supabase.js" "$here/sync-test.js" "$tmp/"
