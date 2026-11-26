@@ -254,19 +254,23 @@ def main(out):
         except Exception as e:  # TCGplayer has no picture yet for some new or promo printings (403)
             images.append(None)
             print(f"WARN no art for {c['key']}: {e}", file=sys.stderr)
-    # A printing without a picture borrows one from another printing of the same
-    # card, same set first: promo stamps (Top 8, Prize Wall) reuse the base art.
-    # The page says where the picture came from.
+    # Only a stamped promo (Prize Wall, Top 8, Champion, Oversized...) may borrow
+    # a picture, and only from the printing it stamps: same name and the same
+    # number and total ("opp-008-167|prize-wall" from "rad-008-167"). Alt arts,
+    # showcases and signatures look different, so those stay without a picture
+    # rather than show a wrong one. The page says where a borrowed one is from.
     name_key = lambda c: re.sub(r"\s*\((overnumbered|alternate art|signature|metal)\)\s*$", "", c["name"].lower()).replace(" - ", ", ")
+    printing = lambda c: (name_key(c), c["riftbound_id"].split("-", 1)[1])  # name, "number-total" without the set
+    stamped = lambda c: bool(c["metadata"].get("label")) and "art" not in c["metadata"]["label"].lower()
     donors = {}
     for i, c in enumerate(raw):
-        if images[i] is not None:
-            donors.setdefault((c["set"]["set_id"], name_key(c)), i)
-            donors.setdefault(name_key(c), i)
+        if images[i] is not None and not stamped(c):
+            donors.setdefault((c["set"]["set_id"],) + printing(c), i)
+            donors.setdefault(printing(c), i)
     art_from = {}
     for i, c in enumerate(raw):
-        if images[i] is None:
-            d = donors.get((c["set"]["set_id"], name_key(c)), donors.get(name_key(c)))
+        if images[i] is None and stamped(c):
+            d = donors.get((c["set"]["set_id"],) + printing(c), donors.get(printing(c)))
             if d is not None:
                 images[i], art_from[c["key"]] = images[d], raw[d]
     missing = [c["key"] for c, im in zip(raw, images) if im is None]
