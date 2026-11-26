@@ -25,6 +25,7 @@ from pathlib import Path
 
 CM = "https://downloads.s3.cardmarket.com/productCatalog"
 GAME = 22  # Riftbound's game id on Cardmarket
+RANK = {"": 0, "Alt art": 1, "Overnumbered": 2, "Signature": 3}
 
 
 def get_json(url, tries=3):
@@ -52,6 +53,10 @@ def pair(cards, products, trend):
     for p in products:
         theirs[norm(p["name"])].append(p)
     for name, cs in ours.items():
+        # Cardmarket adds a card's printings in rarity order (standard, alt art,
+        # overnumbered, signature), so ours are put in that order too; collector
+        # order alone puts a signature (229*) before its overnumbered twin (229).
+        cs = sorted(cs, key=lambda c: RANK.get(c["variant"], len(RANK)))
         ps = sorted(theirs.get(name, []), key=lambda p: p["idProduct"])
         if len(ps) != len(cs):
             continue

@@ -4,6 +4,7 @@
 # (pnpm dlx playwright install chromium-headless-shell) and python3.
 set -u
 here=$(cd "$(dirname "$0")" && pwd); site="$here/../docs"; tmp=$(mktemp -d); port=8766
+python3 -I "$here/test_prices.py" || exit 1
 trap 'kill "$srv" 2>/dev/null; rm -rf "$tmp"' EXIT
 ln -s "$site/cards.json" "$tmp/cards.json"; ln -s "$site/sheets" "$tmp/sheets"; ln -s "$site/prices.json" "$tmp/prices.json"
 cp "$here/fake-supabase.js" "$here/sync-test.js" "$tmp/"
