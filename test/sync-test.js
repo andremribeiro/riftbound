@@ -96,6 +96,23 @@ function legalDeck() {
       ok("the value counter is copies times trend price", prices[c.id] > 0 && !$("#worth").hidden && $("#worth-value").textContent === euro(expected)
         && Math.abs(expected - 5 * prices[c.id]) < 1e-9);
       ok("the shown count follows taps", $("#count").textContent.endsWith(", 1 owned"));
+      const chip = (key, value) => document.querySelector(`#filter-groups .chip[data-key="${key}"][data-value="${value}"]`).click();
+      chip("show", "spares");
+      ok("Spares shows copies beyond a playset", !c.t.tile.hidden && $("#count").textContent.startsWith("1 card with spares, 2 spare copies"));
+      chip("show", "missing");
+      $("#export-wants").click();
+      const parts = [...document.querySelectorAll("#export-body textarea")].map((t) => t.value.split("\n"));
+      const wantLines = parts.flat();
+      ok("the missing cards copy as a Cardmarket wants list", $("#export").open && wantLines.length > 1000
+        && wantLines.every((l) => /^1x \S/.test(l) && !l.includes(" - ")) && parts.every((x) => x.length <= 150) && parts.length > 1);
+      $("#export").close();
+      chip("show", "all"); chip("sort", "price-desc");
+      const first = byId[$("#grid").firstElementChild.querySelector(".art").dataset.id];
+      ok("sorting by price puts the dearest card first", prices[first.id] === Math.max(...Object.values(prices)));
+      chip("sort", "cost");
+      const costs = [...$("#grid").children].slice(0, 300).map((t) => byId[t.querySelector(".art").dataset.id].cost ?? 99);
+      ok("sorting by energy cost orders the grid", costs.every((x, i) => i === 0 || costs[i - 1] <= x));
+      chip("sort", "set");
 
       add.click(); await sleep(620); add.click();  // second tap lands while the first save is in flight
       await sleep(1000);
@@ -138,6 +155,10 @@ function legalDeck() {
         && [...pool.tiles.keys()].every((k) => allowedIn(firstOf[k], L)));
       pool.tiles.get(nameKey(champ.name)).add.click(); await sleep(50);
       ok("the first champion added becomes the Chosen Champion", deckOf(id).champion === champ.id);
+      [...document.querySelectorAll("#decklist button")].find((x) => x.textContent === "Copy missing cards for Cardmarket").click();
+      ok("a deck's missing cards copy as a wants list with counts", $("#export").open
+        && $("#export-body textarea").value.split("\n").includes(`1x ${cmName(L)}`));
+      $("#export").close();
       await sleep(1000);
       ok("the deck saves to the database", __decks.find((x) => x.id === id)?.legend === L.id);
       window.confirm = () => true;

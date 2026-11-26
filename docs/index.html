@@ -122,6 +122,9 @@ input[type="search"], input[type="email"], input[type="password"], .deck-name {
 .chip[aria-pressed="true"] .progress { background: rgb(127 127 127 / .35); }
 .progress i { display: block; height: 100%; background: currentColor; }
 .count { margin: 0 0 12px; font-size: 13px; color: var(--ink-2); }
+.count-row { justify-content: space-between; margin-bottom: 4px; }
+.count-row .count { margin: 0; }
+.wants { width: 100%; min-height: 160px; font: 14px/1.5 var(--font); }
 .empty { padding: 48px 0; text-align: center; color: var(--ink-2); }
 
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap: 22px 16px; }
@@ -317,7 +320,7 @@ textarea.field { border-radius: 12px; min-height: 72px; resize: vertical; }
       <button type="button" class="btn" id="open-filters">Filters <span class="badge" id="filter-count" hidden></span></button>
     </div>
     <div class="chips sets" id="sets" aria-label="Sets"></div>
-    <p class="count" id="count"></p>
+    <div class="row count-row"><p class="count" id="count"></p><button type="button" class="btn quiet" id="export-wants" hidden>Copy as Cardmarket wants list</button></div>
     <div class="grid" id="grid"></div>
     <p class="empty" id="empty" hidden>No cards match these filters.</p>
   </section>
@@ -348,6 +351,7 @@ textarea.field { border-radius: 12px; min-height: 72px; resize: vertical; }
       <button type="button" class="chip" data-mode="theirs">Their cards</button>
       <button type="button" class="chip" data-mode="mine">My cards</button>
       <button type="button" class="chip" id="friend-only"></button>
+      <button type="button" class="chip" id="friend-spares" hidden>Only spares</button>
     </div>
     <div class="toolbar"><input type="search" id="friend-q" placeholder="Search by name or number" aria-label="Search these cards"></div>
     <p class="count" id="friend-count"></p>
@@ -393,6 +397,7 @@ textarea.field { border-radius: 12px; min-height: 72px; resize: vertical; }
   <button type="button" class="btn" id="tradebar-review">Review offer</button>
 </div>
 
+<dialog class="sheet" id="export" aria-label="Cardmarket wants list"><div class="sheet-in" id="export-body"></div></dialog>
 <dialog class="sheet" id="offer" aria-label="Trade offer"><div class="sheet-in" id="offer-body"></div></dialog>
 
 <dialog class="sheet" id="filters" aria-label="Filters">
@@ -434,12 +439,12 @@ function nameKey(name) {
 }
 const plainName = (c) => c.name.replace(/\s*\((Overnumbered|Alternate Art|Signature|Metal)\)\s*$/, "");
 
-let cards = [], sets = [], byId = {}, COLS, ROWS, BUILD = "", prices = {}, pricesDate = null, user = null, flushTimer;
+let setOrder = [], cards = [], sets = [], byId = {}, COLS, ROWS, BUILD = "", prices = {}, pricesDate = null, user = null, flushTimer;
 let sessionKnown = false, loadedOnce = false;  // has auth answered; has this visit loaded from Supabase
 let decksError = null;                         // why decks didn't load on the last attempt, if they didn't
 const printings = {};  // name key -> every printing, in collector order
 const firstOf = {};    // name key -> the printing decks use
-const f = { set: "all", q: "", show: "all", rarity: "", domain: "", type: "", variant: "" };
+const f = { set: "all", q: "", show: "all", rarity: "", domain: "", type: "", variant: "", sort: "set" };
 const ui = { deck: null, poolType: "", poolQ: "", legendQ: "" };
 
 // The device keeps the last saved state (instant start, offline browsing) and
@@ -477,12 +482,27 @@ const qty = (c) => (pending.has(c.id) ? pending.get(c.id) : saved[c.id] || 0);
 const ownedByName = (k) => printings[k].reduce((s, c) => s + qty(c), 0);
 const status = (msg, err = false) => { const e = $("#status"); e.textContent = msg; e.classList.toggle("err", err); };
 const fmt = (x) => x.toLocaleString();
+const many = (n, word) => `${fmt(n)} ${n === 1 ? word : `${word}s`}`;
 const money = new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR" });
 const euro = (x) => (x == null ? "" : money.format(x));
 const hasWords = (hay, q) => q.split(/\s+/).every((w) => hay.includes(w));  // every typed word, in any order
 const shortSet = (s) => s.name.replace(/^Riftbound /, "").replace("Promotional Cards", "Promos");
 const cheapest = (k) => { const ps = printings[k].map((c) => prices[c.id]).filter((p) => p != null); return ps.length ? Math.min(...ps) : null; };
 const IDLE = "All changes saved.";
+// What a player keeps of a printing; copies above it are spares to trade:
+// a playset of 3, one legend or battlefield, 12 of a rune, one token.
+const KEEP = { Legend: 1, Battlefield: 1, Rune: 12 };
+const spare = (c, have = qty(c)) => Math.max(0, have - (c.super === "Token" ? 1 : KEEP[c.type] ?? 3));
+const SORTS = [["set", "Set and number"], ["price-desc", "Price, high to low"], ["price-asc", "Price, low to high"], ["cost", "Energy cost"], ["name", "Name"]];
+const SORTERS = {  // stable sorts: ties keep set order; unpriced and costless cards go last
+  "price-desc": (a, b) => (prices[b.id] ?? -1) - (prices[a.id] ?? -1),
+  "price-asc": (a, b) => (prices[a.id] ?? Infinity) - (prices[b.id] ?? Infinity) || 0,
+  cost: (a, b) => (a.cost ?? 99) - (b.cost ?? 99),
+  name: (a, b) => plainName(a).localeCompare(plainName(b)),
+};
+const sorted = (list) => (SORTERS[f.sort] ? [...list].sort(SORTERS[f.sort]) : list);
+// Cardmarket writes "Jinx, Loose Cannon" where Riftcodex has "Jinx - Loose Cannon".
+const cmName = (c) => plainName(c).replace(/ - /g, ", ");
 
 // Saves and loads run one at a time in the order asked, so a load can never
 // land between a save and the tap after it, and two loads never race.
@@ -554,7 +574,8 @@ function makeTile(c, label) {
 function buildCollection() {
   const frag = document.createDocumentFragment();
   const rank = Object.fromEntries(sets.map((s, i) => [s.id, i]));
-  for (const c of [...cards].sort((a, b) => rank[a.set] - rank[b.set] || a.i - b.i)) {  // grid follows the set order
+  setOrder = [...cards].sort((a, b) => rank[a.set] - rank[b.set] || a.i - b.i);  // the grid follows the set order
+  for (const c of setOrder) {
     c.t = makeTile(c);
     c.t.add.setAttribute("aria-label", `Add a copy of ${c.name}`);
     frag.append(c.t.tile);
@@ -584,7 +605,8 @@ function buildCollection() {
   $("#q").addEventListener("input", (e) => { f.q = e.target.value.trim().toLowerCase(); applyFilters(); });
 
   const groups = [
-    ["show", "Show", [["all", "All cards"], ["owned", "Owned"], ["missing", "Missing"]]],
+    ["sort", "Sort by", SORTS],
+    ["show", "Show", [["all", "All cards"], ["owned", "Owned"], ["missing", "Missing"], ["spares", "Spares"]]],
     ["rarity", "Rarity", [["", "Any"], ...RARITIES.map((r) => [r, r])]],
     ["domain", "Domain", [["", "Any"], ...DOMAINS.map((d) => [d, d])]],
     ["type", "Card type", [["", "Any"], ...TYPES.map((t) => [t, t])]],
@@ -605,16 +627,22 @@ function buildCollection() {
   $("#filter-groups").addEventListener("click", (e) => {
     const b = e.target.closest(".chip"); if (!b) return;
     f[b.dataset.key] = b.dataset.value;
+    if (b.dataset.key === "sort") for (const c of sorted(setOrder)) $("#grid").append(c.t.tile);  // moves the tiles into the new order
     applyFilters();
   });
   $("#open-filters").addEventListener("click", () => $("#filters").showModal());
+  $("#export-wants").addEventListener("click", () => {
+    const names = [...new Set(cards.filter((c) => !c.t.tile.hidden).map(cmName))];
+    showWants("Wants list for the missing cards", names.map((n) => `1x ${n}`),
+      "One copy of each card shown; printings of the same card are one line.");
+  });
   $("#clear-filters").addEventListener("click", () => { Object.assign(f, { show: "all", rarity: "", domain: "", type: "", variant: "" }); applyFilters(); });
 }
 
 function matches(c) {
   if (f.set !== "all" && c.set !== f.set) return false;
   const own = qty(c) > 0;
-  if ((f.show === "owned" && !own) || (f.show === "missing" && own)) return false;
+  if ((f.show === "owned" && !own) || (f.show === "missing" && own) || (f.show === "spares" && !spare(c))) return false;
   if (f.rarity && c.rarity !== f.rarity) return false;
   if (f.domain && !c.domain.includes(f.domain)) return false;
   if (f.type && c.type !== f.type) return false;
@@ -636,8 +664,40 @@ function applyFilters() {
 function renderCount() {
   const shown = cards.filter((c) => !c.t.tile.hidden);
   const own = shown.filter((c) => qty(c) > 0).length;
-  $("#count").textContent = `${fmt(shown.length)} cards shown, ${fmt(own)} owned`;
+  if (f.show === "spares") {
+    const copies = shown.reduce((s, c) => s + spare(c), 0), worth = shown.reduce((s, c) => s + spare(c) * (prices[c.id] || 0), 0);
+    $("#count").textContent = `${many(shown.length, "card")} with spares, ${fmt(copies)} spare ${copies === 1 ? "copy" : "copies"}${worth ? `, worth about ${euro(worth)}` : ""}`;
+  } else $("#count").textContent = `${many(shown.length, "card")} shown, ${fmt(own)} owned`;
   $("#empty").hidden = shown.length > 0;
+  $("#export-wants").hidden = f.show !== "missing" || !shown.length;
+}
+
+// Cardmarket's wants import takes one card per line ("2x Card Name"), and a
+// wants list holds at most 150 entries, so longer lists come in parts.
+function showWants(title, lines, note) {
+  const head = el("div", "sheet-head");
+  const close = el("button", "close", "×"); close.type = "button"; close.dataset.close = ""; close.setAttribute("aria-label", "Close");
+  head.append(el("h2", "", title), close);
+  const how = el("p", "muted", "On Cardmarket: Buying, My Wants, +Add List. Open the list with View / Edit, paste this in and press Add. "
+    + "Cardmarket matches by name, so choose the printing you want there. Lines it can't match are listed as not added.");
+  const parts = [];
+  for (let i = 0; i < lines.length; i += 150) parts.push(lines.slice(i, i + 150));
+  const body = [head, how];
+  if (note) body.push(el("p", "muted", note));
+  if (parts.length > 1) body.push(el("p", "", `That's ${lines.length} cards. A wants list holds 150, so it comes in ${parts.length} parts, one list each.`));
+  parts.forEach((part, i) => {
+    const area = el("textarea", "field wants"); area.readOnly = true; area.value = part.join("\n");
+    area.setAttribute("aria-label", parts.length > 1 ? `Part ${i + 1}` : "Wants list");
+    const copy = el("button", "btn primary", parts.length > 1 ? `Copy part ${i + 1}` : "Copy");
+    copy.type = "button";
+    copy.onclick = async () => {
+      try { await navigator.clipboard.writeText(area.value); status("Copied. Paste it into your Cardmarket wants list."); }
+      catch (e) { area.focus(); area.select(); status(`Couldn't copy automatically (${e.message}); the text is selected, copy it from there.`, true); }
+    };
+    body.push(area, copy);
+  });
+  $("#export-body").replaceChildren(...body);
+  $("#export").showModal();
 }
 
 function renderCollection() {
@@ -961,6 +1021,12 @@ function renderDeckList(d, L) {
   const ownLine = el("p", "num", own.have === own.total ? "You own every card in this deck."
     : `You own ${own.have} of ${own.total} cards. The missing ones cost about ${euro(own.cost)} at Cardmarket trend prices${own.unpriced ? `, plus ${own.unpriced} without a price` : ""}.`);
   ownLine.style.margin = "0";
+  const short = new Map();  // name key -> copies the deck needs that you don't own
+  for (const [c, n] of [[L, 1], ...deckEntries(d)]) short.set(nameKey(c.name), (short.get(nameKey(c.name)) || 0) + n);
+  const wants = [...short].map(([k, n]) => [k, n - Math.min(n, ownedByName(k))]).filter(([, n]) => n > 0);
+  const exportBtn = el("button", "btn", "Copy missing cards for Cardmarket"); exportBtn.type = "button";
+  exportBtn.hidden = !wants.length;
+  exportBtn.onclick = () => showWants(`Wants list for ${d.name || "this deck"}`, wants.map(([k, n]) => `${n}x ${cmName(firstOf[k])}`));
   const checks = el("ul", "checks");
   if (chk.legal) checks.append(el("li", "ok", "This deck is legal."));
   for (const t of chk.issues) checks.append(el("li", "bad", t));
@@ -992,7 +1058,7 @@ function renderDeckList(d, L) {
     return s;
   });
   if (!lists.length) lists.push(el("p", "muted", "Add cards from the list. The first copy of your champion becomes the Chosen Champion."));
-  $("#decklist").replaceChildren(legend, tally, ownLine, checks, ...lists);
+  $("#decklist").replaceChildren(legend, tally, ownLine, exportBtn, checks, ...lists);
 }
 
 function buildDecks() {
@@ -1025,7 +1091,7 @@ function buildDecks() {
 
 // Online only: unlike counts and decks, these aren't queued on the device.
 const social = { loaded: false, error: null, me: null, friends: [], names: {}, trades: [], pendingAdd: "", nameDraft: null };
-const friend = { id: null, cards: {}, loaded: false, error: null, mode: "theirs", onlyNew: true, q: "", key: "", tiles: new Map() };
+const friend = { id: null, cards: {}, loaded: false, error: null, mode: "theirs", onlyNew: true, onlySpares: false, q: "", key: "", tiles: new Map() };
 const offer = { to: null, get: new Map(), give: new Map(), note: "" };
 const nameOf = (id) => social.names[id] || "A former friend";
 const sumOf = (m) => [...m.values()].reduce((s, n) => s + n, 0);
@@ -1231,15 +1297,17 @@ function renderFriend() {
   for (const b of $("#friend-modes").querySelectorAll("[data-mode]")) b.setAttribute("aria-pressed", b.dataset.mode === friend.mode);
   $("#friend-only").textContent = friend.mode === "theirs" ? "Only ones I'm missing" : "Only ones they're missing";
   $("#friend-only").setAttribute("aria-pressed", friend.onlyNew);
+  $("#friend-spares").hidden = friend.mode !== "mine";
+  $("#friend-spares").setAttribute("aria-pressed", friend.onlySpares);
 
   // The grid is rebuilt only when what it lists changes; taps just repaint counts.
-  const key = [id, ready, friend.mode, friend.onlyNew, friend.q].join("|");
+  const key = [id, ready, friend.mode, friend.onlyNew, friend.onlySpares, friend.q, f.sort].join("|");
   if (key !== friend.key) {
     friend.key = key; friend.tiles.clear();
-    const list = !ready ? [] : cards.filter((c) => (friend.mode === "theirs"
+    const list = !ready ? [] : sorted(cards.filter((c) => (friend.mode === "theirs"
       ? theirs(c) > 0 && (!friend.onlyNew || qty(c) === 0)
-      : qty(c) > 0 && (!friend.onlyNew || theirs(c) === 0))
-      && (!friend.q || hasWords(`${c.name} ${c.set} ${c.no} ${c.set}${c.no}`.toLowerCase(), friend.q)));
+      : qty(c) > 0 && (!friend.onlyNew || theirs(c) === 0) && (!friend.onlySpares || spare(c) > 0))
+      && (!friend.q || hasWords(`${c.name} ${c.set} ${c.no} ${c.set}${c.no}`.toLowerCase(), friend.q))));
     const frag = document.createDocumentFragment();
     for (const c of list) {
       const t = makeTile(c);
@@ -1315,7 +1383,9 @@ function renderOffer() {
 function buildFriends() {
   $("#friend-modes").addEventListener("click", (e) => {
     const b = e.target.closest("button"); if (!b) return;
-    if (b.id === "friend-only") friend.onlyNew = !friend.onlyNew; else friend.mode = b.dataset.mode;
+    if (b.id === "friend-only") friend.onlyNew = !friend.onlyNew;
+    else if (b.id === "friend-spares") friend.onlySpares = !friend.onlySpares;
+    else friend.mode = b.dataset.mode;
     renderFriend();
   });
   $("#friend-q").addEventListener("input", (e) => { friend.q = e.target.value.trim().toLowerCase(); renderFriend(); });
