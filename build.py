@@ -66,7 +66,7 @@ def rules_text(text):
     rich = text.get("rich") or ""
     if not rich:
         return text.get("plain") or ""
-    rich = re.sub(r"<li>", "\u2022 ", re.sub(r"</p>|<br\s*/?>|</li>", "\n", rich))
+    rich = re.sub(r"<li>", "\u2022 ", re.sub(r"</p>|<br\s*/?>|</li>", "\n", rich.replace("\r", "")))
     return re.sub(r"\n{2,}", "\n", html.unescape(re.sub(r"<[^>]+>", "", rich))).strip()
 
 
@@ -150,30 +150,95 @@ def official_cards(skip_sets):
         return parse_gallery(r.read().decode("utf-8"), skip_sets)
 
 
+TCG = "https://tcgcsv.com/tcgplayer/89"  # TCGplayer's Riftbound catalogue, mirrored daily by tcgcsv.com
+IMPLIED = {"signature", "overnumbered", "alternate art"}  # labels the collector number already encodes
+
+
+def tcg_cards(known_ids, known_tcg):
+    """Printings TCGplayer lists that neither Riftcodex nor Riot's gallery has:
+    some sets' runes and tokens, signature legends, tournament promos (Top 8,
+    Champion), oversized cards and small releases. Ids follow Riftcodex's
+    pattern (set-number[-total]), so a card Riftcodex adds later keeps its id;
+    a printing label the number doesn't encode ("Oversized", "Top 8") is
+    appended the way Riftcodex appends "|metal"."""
+    ext = lambda p: {e["name"]: e["value"] for e in p.get("extendedData", [])}
+    cards, sets, used = [], {}, set(known_ids)
+    for g in get_json(f"{TCG}/groups")["results"]:
+        abbr = re.sub(r"[^A-Z0-9]", "", g["abbreviation"].upper())
+        for p in get_json(f"{TCG}/{g['groupId']}/products")["results"]:
+            e = ext(p)
+            if not e.get("Number") or str(p["productId"]) in known_tcg:
+                continue  # sealed product, or a card Riftcodex already has
+            front, _, back = e["Number"].lower().replace(" ", "").partition("//")  # double-sided tokens: "t01//t05"
+            n, _, total = front.partition("/")
+            m = re.match(r"(.*?)\s*\(([^)]*)\)\s*$", p["name"])
+            name, label = (m.group(1), m.group(2)) if m else (p["name"], "")
+            if label.lower() == n or label.lower() in IMPLIED:
+                label = ""  # "Fury Rune (R01a)", "(Signature)": already in the number
+            key = f"{abbr.lower()}-{n}" + (f"-{total}" if total else "") + (f"-{back}" if back else "")
+            if label:
+                key += "|" + re.sub(r"[^a-z0-9]+", "-", label.lower()).strip("-")
+            elif key in known_ids:
+                continue  # the same card, just without a TCGplayer id on our side
+            if key in used:
+                key += f"|tcg{p['productId']}"
+            used.add(key)
+            types = e.get("Card Type", "")
+            kind = next((t for t in ("Legend", "Battlefield", "Rune", "Unit", "Spell", "Gear") if t in types), "Unit")
+            supertype = ("Token" if "Token" in types else "Champion" if "Champion" in types
+                         else "Signature" if "Signature" in types else "Basic" if kind == "Rune" else None)
+            num = lambda k: int(e[k]) if e.get(k, "").isdigit() else None
+            playable = kind in ("Unit", "Spell", "Gear")
+            cards.append({
+                "riftbound_id": key.split("|")[0], "key": key, "name": name,
+                "collector_number": int(re.sub(r"\D", "", n) or 0),
+                "tags": [t for t in e.get("Tag", "").split(";") if t],
+                "attributes": {"energy": num("Energy Cost") if playable else None,
+                               "might": num("Might") if kind == "Unit" else None, "power": num("Power Cost") or None},
+                "classification": {"type": kind, "supertype": supertype, "rarity": e.get("Rarity", "Promo"),
+                                   "domain": [d for d in e.get("Domain", "").split(";") if d and d != "None"] or ["Colorless"]},
+                "text": {"rich": e.get("Description", ""), "plain": ""},
+                "set": {"set_id": abbr, "label": g["name"]},
+                "media": {"image_url": p["imageUrl"].replace("_200w.jpg", "_in_1000x1000.jpg")},
+                "orientation": "landscape" if kind == "Battlefield" else "portrait",
+                "metadata": {"clean_name": name, "alternate_art": False, "overnumbered": False, "signature": False, "label": label},
+            })
+            sets[abbr] = {"set_id": abbr, "name": g["name"], "published_on": g["publishedOn"][:10], "main": False}
+    return cards, sets
+
+
 def main(out):
     sets = get_json(f"{API}/sets")["items"]
+    for s in sets:
+        s["main"] = "Promotional" not in s["name"]
     raw = fetch_cards()
     # Card ids stay Riftcodex's, so saved collections keep matching; Riot's
     # gallery only fills in sets Riftcodex hasn't added yet.
     extra, extra_sets = official_cards({s["set_id"] for s in sets})
     raw += extra
     # A set only in the gallery has no release date here; it sorts after the known ones.
-    sets += [{"set_id": k, "name": v, "published_on": "9999"} for k, v in extra_sets.items()]
+    sets += [{"set_id": k, "name": v, "published_on": "9999", "main": True} for k, v in extra_sets.items()]
     print(f"from Riot's gallery: {len(extra)} cards in {', '.join(extra_sets) or 'no new sets'}")
-    # Main releases first in release order, promo sets after them.
-    sets.sort(key=lambda s: ("Promotional" in s["name"], s["published_on"], s["set_id"]))
-    order = {s["set_id"]: i for i, s in enumerate(sets)}
 
     # The API carries stale copies of some cards (clean_name unset, same
     # riftbound_id as the current record): drop them. Metal promos really
     # share their base card's id and art, so they get a key suffix instead.
     curated = {c["riftbound_id"] for c in raw if c["metadata"]["clean_name"]}
+    known_tcg = {str(c["tcgplayer_id"]) for c in raw if c.get("tcgplayer_id")}
     raw = [c for c in raw if c["metadata"]["clean_name"] or c["riftbound_id"] not in curated]
     for c in raw:
         c["key"] = c["riftbound_id"] + ("|metal" if c["name"].endswith("(Metal)") else "")
-    # Numbered cards first, then the ones whose number has a prefix (runes r01, sp1, tokens t03).
+    more, more_sets = tcg_cards({c["key"] for c in raw}, known_tcg)
+    raw += more
+    sets += [s for k, s in more_sets.items() if k not in {x["set_id"] for x in sets}]
+    print(f"from TCGplayer: {len(more)} printings missing elsewhere")
+    # Main releases first in release order; promos and small releases after them.
+    sets.sort(key=lambda s: (not s["main"], s["published_on"], s["set_id"]))
+    order = {s["set_id"]: i for i, s in enumerate(sets)}
+    # Numbered cards first, then the ones whose number has a prefix (runes r01,
+    # sp1, tokens t03); a signature (229*) after the overnumbered card (229).
     special = lambda c: not c["riftbound_id"].split("-")[1][:1].isdigit()
-    raw.sort(key=lambda c: (order.get(c["set"]["set_id"], 99), special(c), c["collector_number"], c["key"]))
+    raw.sort(key=lambda c: (order.get(c["set"]["set_id"], 99), special(c), c["collector_number"], "*" in c["riftbound_id"], c["key"]))
     keys = [c["key"] for c in raw]
     dupes = {k for k in keys if keys.count(k) > 1}
     assert not dupes, f"duplicate card keys, extend the dedupe rule above: {sorted(dupes)}"
@@ -181,40 +246,54 @@ def main(out):
     with ThreadPoolExecutor(16) as pool:
         futures = [pool.submit(fetch_art, c["media"]["image_url"]) if c["media"].get("image_url") else None for c in raw]
 
+    images = []
+    for c, f in zip(raw, futures):
+        try:
+            images.append(f.result() if f else None)
+        except Exception as e:  # TCGplayer has no picture yet for some new or promo printings (403)
+            images.append(None)
+            print(f"WARN no art for {c['key']}: {e}", file=sys.stderr)
+    # A printing without a picture borrows one from another printing of the same
+    # card, same set first: promo stamps (Top 8, Prize Wall) reuse the base art.
+    # The page says where the picture came from.
+    name_key = lambda c: re.sub(r"\s*\((overnumbered|alternate art|signature|metal)\)\s*$", "", c["name"].lower()).replace(" - ", ", ")
+    donors = {}
+    for i, c in enumerate(raw):
+        if images[i] is not None:
+            donors.setdefault((c["set"]["set_id"], name_key(c)), i)
+            donors.setdefault(name_key(c), i)
+    art_from = {}
+    for i, c in enumerate(raw):
+        if images[i] is None:
+            d = donors.get((c["set"]["set_id"], name_key(c)), donors.get(name_key(c)))
+            if d is not None:
+                images[i], art_from[c["key"]] = images[d], raw[d]
+    missing = [c["key"] for c, im in zip(raw, images) if im is None]
+
     (out / "sheets").mkdir(parents=True, exist_ok=True)
     for old in (out / "sheets").glob("*.webp"):
         old.unlink()
-    missing, sheet = [], None
-    for i, (c, f) in enumerate(zip(raw, futures)):
-        if i % PER_SHEET == 0:
-            if sheet:
-                sheet.save(out / "sheets" / f"{i // PER_SHEET - 1}.webp", quality=72, method=6)
-            sheet = Image.new("RGB", (COLS * TILE_W, ROWS * TILE_H), (20, 22, 30))
-        try:
-            im = f.result() if f else None
-        except Exception as e:
-            im = None
-            print(f"WARN no art for {c['key']}: {e}", file=sys.stderr)
-        if im is None:
-            missing.append(c["key"])
-            continue
-        p = i % PER_SHEET
-        sheet.paste(im, ((p % COLS) * TILE_W, (p // COLS) * TILE_H))
-    sheet.save(out / "sheets" / f"{(len(raw) - 1) // PER_SHEET}.webp", quality=72, method=6)
+    for first in range(0, len(raw), PER_SHEET):
+        sheet = Image.new("RGB", (COLS * TILE_W, ROWS * TILE_H), (20, 22, 30))
+        for p, im in enumerate(images[first:first + PER_SHEET]):
+            if im is not None:
+                sheet.paste(im, ((p % COLS) * TILE_W, (p // COLS) * TILE_H))
+        sheet.save(out / "sheets" / f"{first // PER_SHEET}.webp", quality=72, method=6)
 
     def variant(c):
         # The id is more reliable than the metadata flags, which are unset on
         # newer sets: "unl-229*-219" signature, "ven-042a-166" alt art,
         # "ven-189-166" overnumbered (number above the set size).
+        # Runes and specials have no total ("sfd-r06a"); their letter suffix still marks the alt art.
         m, parts = c["metadata"], c["riftbound_id"].split("-")
-        no = parts[1] if len(parts) == 3 else ""
+        no, total = parts[1], parts[2] if len(parts) == 3 else ""
         if "*" in no or m["signature"]:
             return "Signature"
         if no[-1:].isalpha() or m["alternate_art"]:
             return "Alt art"
-        if (no.isdigit() and parts[2].isdigit() and int(no) > int(parts[2])) or m["overnumbered"]:
+        if (no.isdigit() and total.isdigit() and int(no) > int(total)) or m["overnumbered"]:
             return "Overnumbered"
-        return "Metal" if c["key"].endswith("|metal") else ""
+        return "Metal" if c["key"].endswith("|metal") else m.get("label", "")
 
     cards = [
         {
@@ -234,21 +313,23 @@ def main(out):
             "might": c["attributes"]["might"],
             "power": c["attributes"]["power"],
             "text": rules_text(c["text"]),
-            "image": c["media"].get("image_url") or "",
+            "image": (art_from[c["key"]]["media"]["image_url"] if c["key"] in art_from else c["media"].get("image_url")) or "",
             "landscape": c["orientation"] == "landscape",
             "art": c["key"] not in missing,
+            **({"artFrom": art_from[c["key"]]["key"]} if c["key"] in art_from else {}),
             # The page derives sheet and slot from the card's index in this list.
         }
         for c in raw
     ]
-    set_meta = [{"id": s["set_id"], "name": s["name"]} for s in sets if s["set_id"] in {c["set"] for c in cards}]
+    set_meta = [{"id": s["set_id"], "name": s["name"], "main": s["main"]} for s in sets if s["set_id"] in {c["set"] for c in cards}]
     with open(out / "cards.json", "w") as fh:
         # The page adds the build id to sheet URLs, so a phone never pairs new card data with cached old sheets.
         build_id = hashlib.sha1("\n".join(c["id"] for c in cards).encode()).hexdigest()[:10]
         fh.write('{"build":"%s","sets":' % build_id + json.dumps(set_meta) + ',"tile":[%d,%d,%d,%d],"cards":[\n' % (TILE_W, TILE_H, COLS, ROWS))
         fh.write(",\n".join(json.dumps(c, ensure_ascii=False) for c in cards))
         fh.write("\n]}\n")
-    print(f"{len(cards)} cards, {len(set_meta)} sets, {-(-len(cards) // PER_SHEET)} sheets, {len(missing)} without art")
+    print(f"{len(cards)} cards, {len(set_meta)} sets, {-(-len(cards) // PER_SHEET)} sheets, "
+          f"{len(art_from)} showing another printing's art, {len(missing)} without art")
 
 
 if __name__ == "__main__":

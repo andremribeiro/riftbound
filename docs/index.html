@@ -345,7 +345,7 @@ const $ = (s) => document.querySelector(s);
 const RARITIES = ["Common", "Uncommon", "Rare", "Epic", "Showcase", "Promo"];
 const DOMAINS = ["Fury", "Calm", "Mind", "Body", "Chaos", "Order", "Colorless"];
 const TYPES = ["Unit", "Spell", "Gear", "Legend", "Battlefield", "Rune"];
-const VARIANTS = ["Alt art", "Overnumbered", "Signature", "Metal"];
+const VARIANTS = ["Alt art", "Overnumbered", "Signature", "Metal", "Oversized"];
 const MAIN_TYPES = new Set(["Unit", "Spell", "Gear"]);
 const DECK_SECTIONS = [["Unit", "Units"], ["Spell", "Spells"], ["Gear", "Gear"], ["Rune", "Runes"], ["Battlefield", "Battlefields"]];
 const MAX_COPIES = 999;  // matches the check in supabase.sql
@@ -639,6 +639,10 @@ function renderCard() {
   }
 
   const facts = el("div", "facts");
+  if (c.artFrom && byId[c.artFrom]) {
+    const from = byId[c.artFrom];
+    facts.append(el("p", "muted", `No picture of this printing yet; this one is ${shortSet(sets.find((s) => s.id === from.set))} ${from.no}.`));
+  }
   const tags = el("div", "tags");
   tags.append(el("span", "tag", `${shortSet(sets.find((s) => s.id === c.set))} ${c.no}`), el("span", "tag", c.rarity),
     el("span", "tag", c.super ? `${c.super} ${c.type.toLowerCase()}` : c.type));
@@ -1158,8 +1162,8 @@ async function boot() {
     ({ cards, sets } = data);
     BUILD = data.build || "";
     [, , COLS, ROWS] = data.tile;
-    // Newest set first: it's the one being opened. Promo sets stay last.
-    const promo = (s) => s.name.includes("Promotional");
+    // Newest set first: it's the one being opened. Promos and small releases stay last.
+    const promo = (s) => s.main === false || s.name.includes("Promotional");
     sets = [...sets.filter((s) => !promo(s)).reverse(), ...sets.filter(promo)];
   } catch (e) {
     status(`Couldn't load the card list (${e.message}). Reload the page to try again.`, true);
