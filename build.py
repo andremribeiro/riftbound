@@ -235,10 +235,11 @@ def main(out):
     # Main releases first in release order; promos and small releases after them.
     sets.sort(key=lambda s: (not s["main"], s["published_on"], s["set_id"]))
     order = {s["set_id"]: i for i, s in enumerate(sets)}
-    # Numbered cards first, then the ones whose number has a prefix (runes r01,
-    # sp1, tokens t03); a signature (229*) after the overnumbered card (229).
-    special = lambda c: not c["riftbound_id"].split("-")[1][:1].isdigit()
-    raw.sort(key=lambda c: (order.get(c["set"]["set_id"], 99), special(c), c["collector_number"], "*" in c["riftbound_id"], c["key"]))
+    # Numbered cards first, then the ones whose number has a prefix, grouped by
+    # it (runes r01, spirits sp1, tokens t03); a signature (229*) after its
+    # overnumbered twin (229).
+    prefix = lambda c: re.match(r"[a-z]*", c["riftbound_id"].split("-")[1]).group(0)
+    raw.sort(key=lambda c: (order.get(c["set"]["set_id"], 99), prefix(c), c["collector_number"], "*" in c["riftbound_id"], c["key"]))
     keys = [c["key"] for c in raw]
     dupes = {k for k in keys if keys.count(k) > 1}
     assert not dupes, f"duplicate card keys, extend the dedupe rule above: {sorted(dupes)}"
